@@ -7,10 +7,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hejijunhao/lumber/internal/connector"
-	"github.com/hejijunhao/lumber/internal/engine/dedup"
-	"github.com/hejijunhao/lumber/internal/model"
-	"github.com/hejijunhao/lumber/internal/output"
+	"github.com/kaminocorp/lumber/internal/connector"
+	"github.com/kaminocorp/lumber/internal/engine/dedup"
+	"github.com/kaminocorp/lumber/internal/model"
+	"github.com/kaminocorp/lumber/internal/output"
 )
 
 // Processor handles log classification and compaction.

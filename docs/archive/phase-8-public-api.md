@@ -1,6 +1,6 @@
 # Phase 8: Public Library API
 
-**Goal:** Make Lumber importable as a Go library. After this phase, any Go application can `go get github.com/hejijunhao/lumber` and classify log text into canonical events — no subprocess, no stdout parsing, no CLI.
+**Goal:** Make Lumber importable as a Go library. After this phase, any Go application can `go get github.com/kaminocorp/lumber` and classify log text into canonical events — no subprocess, no stdout parsing, no CLI.
 
 **Starting point:** Everything lives under `internal/`. The only entry point is `cmd/lumber/main.go`. Lumber cannot be used as a library.
 
@@ -419,10 +419,10 @@ Sections 1 and 2 are the critical path. Sections 3–6 build on them independent
 
 ### 1. Module path for the public package
 
-Currently the module is `github.com/hejijunhao/lumber`. The public API would be imported as:
+Currently the module is `github.com/kaminocorp/lumber`. The public API would be imported as:
 
 ```go
-import "github.com/hejijunhao/lumber/pkg/lumber"
+import "github.com/kaminocorp/lumber/pkg/lumber"
 ```
 
 This is slightly redundant (`lumber/pkg/lumber`). Alternative: put the public API at the module root — but that requires moving internal code or restructuring the module. The `pkg/lumber` path is the Go convention and avoids disruption.

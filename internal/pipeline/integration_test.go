@@ -11,15 +11,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hejijunhao/lumber/internal/connector"
-	"github.com/hejijunhao/lumber/internal/engine"
-	"github.com/hejijunhao/lumber/internal/engine/classifier"
-	"github.com/hejijunhao/lumber/internal/engine/compactor"
-	"github.com/hejijunhao/lumber/internal/engine/dedup"
-	"github.com/hejijunhao/lumber/internal/engine/embedder"
-	"github.com/hejijunhao/lumber/internal/engine/taxonomy"
+	"github.com/kaminocorp/lumber/internal/connector"
+	"github.com/kaminocorp/lumber/internal/engine"
+	"github.com/kaminocorp/lumber/internal/engine/classifier"
+	"github.com/kaminocorp/lumber/internal/engine/compactor"
+	"github.com/kaminocorp/lumber/internal/engine/dedup"
+	"github.com/kaminocorp/lumber/internal/engine/embedder"
+	"github.com/kaminocorp/lumber/internal/engine/taxonomy"
 
-	_ "github.com/hejijunhao/lumber/internal/connector/vercel"
+	_ "github.com/kaminocorp/lumber/internal/connector/vercel"
 )
 
 // Model paths relative to internal/pipeline/.

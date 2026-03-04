@@ -3,7 +3,7 @@ package lumber
 import (
 	"testing"
 
-	"github.com/hejijunhao/lumber/internal/engine/taxonomy"
+	"github.com/kaminocorp/lumber/internal/engine/taxonomy"
 )
 
 func TestTaxonomyReturnsAllRoots(t *testing.T) {

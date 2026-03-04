@@ -3,7 +3,7 @@ package output
 import (
 	"context"
 
-	"github.com/hejijunhao/lumber/internal/model"
+	"github.com/kaminocorp/lumber/internal/model"
 )
 
 // Output defines the interface for canonical event destinations.

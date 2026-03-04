@@ -1,6 +1,6 @@
 package taxonomy
 
-import "github.com/hejijunhao/lumber/internal/model"
+import "github.com/kaminocorp/lumber/internal/model"
 
 // DefaultRoots returns the built-in taxonomy tree that ships with Lumber.
 // 42 leaves across 8 roots. Leaf descriptions are the texts that get embedded,

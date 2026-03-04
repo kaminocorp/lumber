@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/hejijunhao/lumber/internal/model"
-	"github.com/hejijunhao/lumber/internal/output"
+	"github.com/kaminocorp/lumber/internal/model"
+	"github.com/kaminocorp/lumber/internal/output"
 )
 
 // Multi fans out events to multiple output.Output implementations.

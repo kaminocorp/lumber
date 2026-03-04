@@ -431,7 +431,7 @@ Add a new "Install" section before the existing "Prerequisites" / "Quickstart" s
 ### Pre-built binaries (recommended)
 
 Download the latest release for your platform from
-[GitHub Releases](https://github.com/hejijunhao/lumber/releases):
+[GitHub Releases](https://github.com/kaminocorp/lumber/releases):
 
 | Platform | Archive |
 |----------|---------|
@@ -452,7 +452,7 @@ Runtime library are all included. No additional downloads required.
 
 Requires Go 1.24+ and curl.
 
-    git clone https://github.com/hejijunhao/lumber.git
+    git clone https://github.com/kaminocorp/lumber.git
     cd lumber
     make download-model
     make build

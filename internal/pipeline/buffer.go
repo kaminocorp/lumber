@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hejijunhao/lumber/internal/engine/dedup"
-	"github.com/hejijunhao/lumber/internal/model"
-	"github.com/hejijunhao/lumber/internal/output"
+	"github.com/kaminocorp/lumber/internal/engine/dedup"
+	"github.com/kaminocorp/lumber/internal/model"
+	"github.com/kaminocorp/lumber/internal/output"
 )
 
 // streamBuffer accumulates events and flushes deduplicated batches on a timer.

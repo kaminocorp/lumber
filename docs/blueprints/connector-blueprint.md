@@ -57,9 +57,9 @@ func Providers() []string
 Registration happens at import time. `cmd/lumber/main.go` uses blank imports to trigger registration:
 
 ```go
-_ "github.com/hejijunhao/lumber/internal/connector/flyio"
-_ "github.com/hejijunhao/lumber/internal/connector/supabase"
-_ "github.com/hejijunhao/lumber/internal/connector/vercel"
+_ "github.com/kaminocorp/lumber/internal/connector/flyio"
+_ "github.com/kaminocorp/lumber/internal/connector/supabase"
+_ "github.com/kaminocorp/lumber/internal/connector/vercel"
 ```
 
 At startup, `connector.Get(cfg.Connector.Provider)` retrieves the constructor, and `ctor()` creates the connector instance. This pattern means the main package never imports provider-specific types — connectors are fully self-registering.

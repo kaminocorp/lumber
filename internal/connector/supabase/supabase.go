@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hejijunhao/lumber/internal/connector"
-	"github.com/hejijunhao/lumber/internal/connector/httpclient"
-	"github.com/hejijunhao/lumber/internal/model"
+	"github.com/kaminocorp/lumber/internal/connector"
+	"github.com/kaminocorp/lumber/internal/connector/httpclient"
+	"github.com/kaminocorp/lumber/internal/model"
 )
 
 const defaultEndpoint = "https://api.supabase.com"

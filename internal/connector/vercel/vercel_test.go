@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hejijunhao/lumber/internal/connector"
+	"github.com/kaminocorp/lumber/internal/connector"
 )
 
 func TestToRawLog(t *testing.T) {

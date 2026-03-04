@@ -2,6 +2,7 @@
 
 ## Index
 
+- [0.7.0](#070--2026-03-04) — Module rename: `hejijunhao/lumber` → `kaminocorp/lumber`, git remote migration
 - [0.6.0](#060--2026-02-28) — Output architecture & public library API: multi-output fan-out, async wrapper, file/webhook backends, `pkg/lumber` importable API
 - [0.5.1](#051--2026-02-24) — Post-review fixes: version stdout, timer leak, query validation, corpus test visibility, batch embed filtering
 - [0.5.0](#050--2026-02-23) — Pipeline integration & resilience: structured logging, config validation, per-log error handling, graceful shutdown, CLI flags
@@ -16,6 +17,48 @@
 - [0.2.1](#021--2026-02-19) — ONNX Runtime integration: session lifecycle, raw inference, dynamic tensor discovery
 - [0.2.0](#020--2026-02-19) — Model download pipeline: Makefile target, tokenizer config, vocab path
 - [0.1.0](#010--2026-02-19) — Project scaffolding: module structure, pipeline skeleton, classifier, compactor, and default taxonomy
+
+---
+
+## 0.7.0 — 2026-03-04
+
+**Module rename — `hejijunhao/lumber` → `kaminocorp/lumber`**
+
+Repository moved from personal GitHub account to the Kamino Corp organisation. Go module path, all internal imports, documentation, and git remote updated to `github.com/kaminocorp/lumber`.
+
+### Changed
+
+- **Go module path** — `go.mod` module declaration changed from `github.com/hejijunhao/lumber` to `github.com/kaminocorp/lumber`
+- **All import paths** — 98 import statements across 36 `.go` files updated to new module prefix
+- **Documentation** — clone URLs, `go get` commands, and import examples updated across README and 10 docs files
+- **Git remote** — origin updated to `https://github.com/kaminocorp/lumber.git`
+
+### Not changed
+
+- **`docs/plans/distribution-ref.md`** — retains `hejijunhao/photon` reference (different repo)
+- **`go.sum`** — only third-party deps, unaffected. Regenerated via `go mod tidy`
+- **All internal logic** — zero behaviour changes. Pure string replacement of import paths
+
+### Verification
+
+- `go mod tidy` — clean
+- `go build ./...` — clean
+- `go vet ./...` — clean
+- `go test ./...` — 22 packages pass
+
+### Files changed
+
+| Category | Files |
+|----------|-------|
+| `go.mod` | 1 |
+| Go source (`.go`) | 20 |
+| Go test (`_test.go`) | 16 |
+| Documentation (`.md`) | 11 |
+| **Total** | **48** |
+
+### Implementation plan
+
+`docs/executing/module-rename-kaminocorp.md`
 
 ---
 
@@ -672,7 +715,7 @@ Phase 2 takes the working embedding engine from Phase 1 and validates the full p
 
 ### Added
 
-- Go module (`github.com/hejijunhao/lumber`, Go 1.23) with Makefile (build, test, lint, clean, download-model)
+- Go module (`github.com/kaminocorp/lumber`, Go 1.23) with Makefile (build, test, lint, clean, download-model)
 - `RawLog`, `CanonicalEvent`, `TaxonomyNode`, and `EmbeddedLabel` domain types
 - `Connector` interface with provider registry and self-registering Vercel stub
 - `Embedder` interface with `ONNXEmbedder` stub (awaiting ONNX runtime integration)

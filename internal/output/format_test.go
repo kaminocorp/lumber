@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hejijunhao/lumber/internal/engine/compactor"
-	"github.com/hejijunhao/lumber/internal/model"
+	"github.com/kaminocorp/lumber/internal/engine/compactor"
+	"github.com/kaminocorp/lumber/internal/model"
 )
 
 func baseEvent() model.CanonicalEvent {

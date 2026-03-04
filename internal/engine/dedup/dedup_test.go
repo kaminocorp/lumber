@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hejijunhao/lumber/internal/model"
+	"github.com/kaminocorp/lumber/internal/model"
 )
 
 var t0 = time.Date(2026, 2, 19, 12, 0, 0, 0, time.UTC)

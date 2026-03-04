@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hejijunhao/lumber/internal/connector"
-	"github.com/hejijunhao/lumber/internal/engine/dedup"
-	"github.com/hejijunhao/lumber/internal/model"
+	"github.com/kaminocorp/lumber/internal/connector"
+	"github.com/kaminocorp/lumber/internal/engine/dedup"
+	"github.com/kaminocorp/lumber/internal/model"
 )
 
 // --- mocks ---

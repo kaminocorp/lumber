@@ -39,8 +39,8 @@ type Processor interface {
 
 ### Import Changes
 
-- `pipeline.go`: removed `"github.com/hejijunhao/lumber/internal/engine"` import, added `"log/slog"` and `"sync/atomic"`
-- `pipeline_test.go`: added `"fmt"` and `"github.com/hejijunhao/lumber/internal/connector"` imports
+- `pipeline.go`: removed `"github.com/kaminocorp/lumber/internal/engine"` import, added `"log/slog"` and `"sync/atomic"`
+- `pipeline_test.go`: added `"fmt"` and `"github.com/kaminocorp/lumber/internal/connector"` imports
 
 ### Tests Added (4)
 

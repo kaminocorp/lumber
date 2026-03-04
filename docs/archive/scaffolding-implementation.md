@@ -15,7 +15,7 @@ All 20 files from the scaffolding plan were created. The project compiles (`go b
 | Path | Purpose |
 |------|---------|
 | `.gitignore` | Ignores binaries, ONNX models, IDE files |
-| `go.mod` | Module `github.com/hejijunhao/lumber`, Go 1.23 |
+| `go.mod` | Module `github.com/kaminocorp/lumber`, Go 1.23 |
 | `Makefile` | build, test, lint, clean, download-model targets |
 | `models/.gitkeep` | Placeholder for ONNX model files |
 | `internal/model/rawlog.go` | `RawLog` struct |

@@ -42,14 +42,14 @@ Local types (`vercelResponse`, `vercelLogEntry`, `vercelPagination`) that produc
 The integration test imports the full engine stack:
 
 ```
-github.com/hejijunhao/lumber/internal/engine
-github.com/hejijunhao/lumber/internal/engine/classifier
-github.com/hejijunhao/lumber/internal/engine/compactor
-github.com/hejijunhao/lumber/internal/engine/dedup
-github.com/hejijunhao/lumber/internal/engine/embedder
-github.com/hejijunhao/lumber/internal/engine/taxonomy
-github.com/hejijunhao/lumber/internal/connector
-_ github.com/hejijunhao/lumber/internal/connector/vercel  (blank import for init registration)
+github.com/kaminocorp/lumber/internal/engine
+github.com/kaminocorp/lumber/internal/engine/classifier
+github.com/kaminocorp/lumber/internal/engine/compactor
+github.com/kaminocorp/lumber/internal/engine/dedup
+github.com/kaminocorp/lumber/internal/engine/embedder
+github.com/kaminocorp/lumber/internal/engine/taxonomy
+github.com/kaminocorp/lumber/internal/connector
+_ github.com/kaminocorp/lumber/internal/connector/vercel  (blank import for init registration)
 ```
 
 Reuses `mockOutput` from `pipeline_test.go` — both files are in `package pipeline`.

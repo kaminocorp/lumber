@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hejijunhao/lumber/internal/engine/compactor"
-	"github.com/hejijunhao/lumber/internal/model"
-	"github.com/hejijunhao/lumber/internal/output"
+	"github.com/kaminocorp/lumber/internal/engine/compactor"
+	"github.com/kaminocorp/lumber/internal/model"
+	"github.com/kaminocorp/lumber/internal/output"
 )
 
 // Output writes JSON-encoded canonical events to stdout.

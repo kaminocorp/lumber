@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hejijunhao/lumber/internal/engine/classifier"
-	"github.com/hejijunhao/lumber/internal/engine/compactor"
-	"github.com/hejijunhao/lumber/internal/engine/embedder"
-	"github.com/hejijunhao/lumber/internal/engine/taxonomy"
-	"github.com/hejijunhao/lumber/internal/engine/testdata"
-	"github.com/hejijunhao/lumber/internal/model"
+	"github.com/kaminocorp/lumber/internal/engine/classifier"
+	"github.com/kaminocorp/lumber/internal/engine/compactor"
+	"github.com/kaminocorp/lumber/internal/engine/embedder"
+	"github.com/kaminocorp/lumber/internal/engine/taxonomy"
+	"github.com/kaminocorp/lumber/internal/engine/testdata"
+	"github.com/kaminocorp/lumber/internal/model"
 )
 
 const (

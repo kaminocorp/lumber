@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hejijunhao/lumber/internal/model"
+	"github.com/kaminocorp/lumber/internal/model"
 )
 
 // Config controls deduplication behavior.

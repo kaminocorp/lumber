@@ -3,7 +3,7 @@ package classifier
 import (
 	"math"
 
-	"github.com/hejijunhao/lumber/internal/model"
+	"github.com/kaminocorp/lumber/internal/model"
 )
 
 // Result holds the outcome of classifying a single log embedding.

@@ -8,9 +8,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/hejijunhao/lumber/internal/engine/compactor"
-	"github.com/hejijunhao/lumber/internal/model"
-	"github.com/hejijunhao/lumber/internal/output"
+	"github.com/kaminocorp/lumber/internal/engine/compactor"
+	"github.com/kaminocorp/lumber/internal/model"
+	"github.com/kaminocorp/lumber/internal/output"
 )
 
 const defaultBufSize = 64 * 1024 // 64KB

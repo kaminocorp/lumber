@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hejijunhao/lumber/internal/model"
+	"github.com/kaminocorp/lumber/internal/model"
 )
 
 const (

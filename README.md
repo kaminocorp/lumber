@@ -74,7 +74,7 @@ Becomes:
 ### Setup
 
 ```bash
-git clone https://github.com/hejijunhao/lumber.git
+git clone https://github.com/kaminocorp/lumber.git
 cd lumber
 
 # Download the embedding model (~23MB) and ONNX runtime library
@@ -272,7 +272,7 @@ Lumber uses [MongoDB LEAF (mdbr-leaf-mt)](https://huggingface.co/onnx-community/
 Lumber can be imported as a Go library. Classify log text directly in your application — no subprocess, no stdout parsing.
 
 ```bash
-go get github.com/hejijunhao/lumber
+go get github.com/kaminocorp/lumber
 ```
 
 ### Basic classification

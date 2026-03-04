@@ -339,9 +339,9 @@ Four typed env var readers handle parsing with fallbacks:
 
 Connectors are registered via blank imports:
 ```go
-_ "github.com/hejijunhao/lumber/internal/connector/flyio"
-_ "github.com/hejijunhao/lumber/internal/connector/supabase"
-_ "github.com/hejijunhao/lumber/internal/connector/vercel"
+_ "github.com/kaminocorp/lumber/internal/connector/flyio"
+_ "github.com/kaminocorp/lumber/internal/connector/supabase"
+_ "github.com/kaminocorp/lumber/internal/connector/vercel"
 ```
 
 Each connector's `init()` calls `connector.Register(name, constructor)`. At runtime, `connector.Get(provider)` retrieves the constructor. The main package never imports provider-specific types.

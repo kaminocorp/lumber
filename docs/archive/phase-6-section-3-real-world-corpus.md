@@ -106,7 +106,7 @@ Based on Phase 3 experience (89% → 100% in 3 rounds), description tuning shoul
 ## Verification
 
 ```
-go test -v github.com/hejijunhao/lumber/internal/engine/testdata   # 3 tests pass (153 entries, 42 leaves covered)
+go test -v github.com/kaminocorp/lumber/internal/engine/testdata   # 3 tests pass (153 entries, 42 leaves covered)
 go test ./...                                                        # full suite passes
 go test -v -run TestCorpus ./internal/engine/...                     # accuracy test (requires ONNX model)
 ```

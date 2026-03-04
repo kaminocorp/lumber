@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hejijunhao/lumber/internal/model"
+	"github.com/kaminocorp/lumber/internal/model"
 )
 
 func testEvent(cat string) model.CanonicalEvent {
