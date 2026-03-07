@@ -39,7 +39,8 @@
       "Bash(wc:*)",
       "Bash(go:*)",
       "Bash(find .:*)",
-      "Bash(gh api:*)"
+      "Bash(gh api:*)",
+      "Bash(xargs sed:*)"
     ]
   }
 }

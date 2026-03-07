@@ -13,8 +13,10 @@
 <p align="center">
   <a href="#quickstart">Quickstart</a> ·
   <a href="#how-it-works">How It Works</a> ·
+  <a href="#library-usage">Library API</a> ·
   <a href="#connectors">Connectors</a> ·
   <a href="#taxonomy">Taxonomy</a> ·
+  <a href="docs/integration-guide.md">Integration Guide</a> ·
   <a href="docs/changelog.md">Changelog</a>
 </p>
 
@@ -275,9 +277,14 @@ Lumber can be imported as a Go library. Classify log text directly in your appli
 go get github.com/kaminocorp/lumber
 ```
 
+```go
+import "github.com/kaminocorp/lumber/pkg/lumber"
+```
+
 ### Basic classification
 
 ```go
+// Load once at startup (~100-300ms)
 l, err := lumber.New(lumber.WithModelDir("models/"))
 if err != nil {
     log.Fatal(err)
@@ -291,6 +298,7 @@ fmt.Println(event.Type, event.Category) // ERROR connection_failure
 ### Batch classification
 
 ```go
+// Single batched ONNX inference call — ~10x faster than looping Classify
 events, _ := l.ClassifyBatch([]string{
     "ERROR: connection refused",
     "GET /api/users 200 OK 12ms",
@@ -305,6 +313,7 @@ event, _ := l.ClassifyLog(lumber.Log{
     Text:      "ERROR: connection refused",
     Timestamp: time.Now(),
     Source:    "vercel",
+    Metadata:  map[string]any{"project": "api-prod"},
 })
 ```
 
@@ -317,6 +326,8 @@ for _, cat := range l.Taxonomy() {
 ```
 
 The `Lumber` instance is safe for concurrent use. Create once, reuse across requests.
+
+For complete API reference, integration patterns (monitoring agents, HTTP middleware, batch workers), performance tuning, and troubleshooting, see the **[Integration Guide](docs/integration-guide.md)**.
 
 ---
 
