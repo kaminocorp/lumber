@@ -57,12 +57,12 @@ Or fetch them directly from HuggingFace:
 
 ```bash
 # model_quantized.onnx + vocab.txt
-curl -L https://huggingface.co/onnx-community/mdbr-leaf-mt-ONNX/resolve/main/onnx/model_quantized.onnx -o models/model_quantized.onnx
-curl -L https://huggingface.co/onnx-community/mdbr-leaf-mt-ONNX/resolve/main/vocab.txt -o models/vocab.txt
+curl -L https://huggingface.co/MongoDB/mdbr-leaf-mt/resolve/main/onnx/model_quantized.onnx -o models/model_quantized.onnx
+curl -L https://huggingface.co/MongoDB/mdbr-leaf-mt/resolve/main/vocab.txt -o models/vocab.txt
 
 # projection weights
 mkdir -p models/2_Dense
-curl -L https://huggingface.co/Snowflake/mdbr-leaf-mt/resolve/main/2_Dense/model.safetensors -o models/2_Dense/model.safetensors
+curl -L https://huggingface.co/MongoDB/mdbr-leaf-mt/resolve/main/2_Dense/model.safetensors -o models/2_Dense/model.safetensors
 ```
 
 3. **ONNX Runtime shared library** — `libonnxruntime` must be available at runtime. The `make download-model` target handles this. If installing manually, set `ONNX_RUNTIME_LIB` or ensure the `.dylib`/`.so` is on your library path.

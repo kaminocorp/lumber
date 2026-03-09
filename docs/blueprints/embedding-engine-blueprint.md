@@ -35,9 +35,8 @@ Stage 2: Mean pooling (Go)      [batch, 384]        sentence vector
 Stage 3: Dense projection (Go)  [batch, 1024]       final embedding
 ```
 
-Model files are fetched via `make download-model` from two HuggingFace repositories:
-- `onnx-community/mdbr-leaf-mt-ONNX` — quantized ONNX model, vocab, tokenizer config
-- `MongoDB/mdbr-leaf-mt` — projection layer weights (`2_Dense/model.safetensors`)
+Model files are fetched via `make download-model` from HuggingFace:
+- `MongoDB/mdbr-leaf-mt` — quantized ONNX model, vocab, tokenizer config, and projection layer weights (`2_Dense/model.safetensors`)
 
 ---
 

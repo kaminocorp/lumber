@@ -1,8 +1,6 @@
 .PHONY: build test lint clean download-model
 
-MODEL_REPO  := onnx-community/mdbr-leaf-mt-ONNX
-MODEL_BASE  := https://huggingface.co/$(MODEL_REPO)/resolve/main
-OFFICIAL_BASE := https://huggingface.co/MongoDB/mdbr-leaf-mt/resolve/main
+MODEL_BASE  := https://huggingface.co/MongoDB/mdbr-leaf-mt/resolve/main
 MODEL_DIR   := models
 
 build:
@@ -24,17 +22,17 @@ download-model:
 	else \
 		echo "Downloading ONNX model (quantized int8, ~23MB)..."; \
 		curl -fSL --progress-bar -o $(MODEL_DIR)/model_quantized.onnx       "$(MODEL_BASE)/onnx/model_quantized.onnx"; \
-		curl -fSL --progress-bar -o $(MODEL_DIR)/model_quantized.onnx_data   "$(MODEL_BASE)/onnx/model_quantized.onnx_data"; \
+		curl -fSL --progress-bar -o $(MODEL_DIR)/model_quantized.onnx_data  "$(MODEL_BASE)/onnx/model_quantized.onnx_data"; \
 		echo "Downloading tokenizer files..."; \
-		curl -fSL -o $(MODEL_DIR)/vocab.txt            "$(MODEL_BASE)/vocab.txt"; \
+		curl -fSL -o $(MODEL_DIR)/vocab.txt             "$(MODEL_BASE)/vocab.txt"; \
 		curl -fSL -o $(MODEL_DIR)/tokenizer_config.json "$(MODEL_BASE)/tokenizer_config.json"; \
 		echo "Download complete."; \
 	fi
 	@if [ ! -f $(MODEL_DIR)/2_Dense/model.safetensors ]; then \
 		echo "Downloading projection layer weights (~1.6MB)..."; \
 		mkdir -p $(MODEL_DIR)/2_Dense; \
-		curl -fSL --progress-bar -o $(MODEL_DIR)/2_Dense/model.safetensors "$(OFFICIAL_BASE)/2_Dense/model.safetensors"; \
-		curl -fSL -o $(MODEL_DIR)/2_Dense/config.json                      "$(OFFICIAL_BASE)/2_Dense/config.json"; \
+		curl -fSL --progress-bar -o $(MODEL_DIR)/2_Dense/model.safetensors "$(MODEL_BASE)/2_Dense/model.safetensors"; \
+		curl -fSL -o $(MODEL_DIR)/2_Dense/config.json                      "$(MODEL_BASE)/2_Dense/config.json"; \
 	fi
 	@if [ ! -f $(MODEL_DIR)/libonnxruntime.so ]; then \
 		ORT_SO=$$(find $$(go env GOMODCACHE) -path "*/yalue/onnxruntime_go@*/test_data/onnxruntime_arm64.so" 2>/dev/null | head -1); \

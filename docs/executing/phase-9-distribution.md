@@ -328,11 +328,11 @@ jobs:
         run: |
           mkdir -p models/2_Dense
           curl -fSL -o models/model_quantized.onnx \
-            "https://huggingface.co/onnx-community/mdbr-leaf-mt-ONNX/resolve/main/onnx/model_quantized.onnx"
+            "https://huggingface.co/MongoDB/mdbr-leaf-mt/resolve/main/onnx/model_quantized.onnx"
           curl -fSL -o models/model_quantized.onnx_data \
-            "https://huggingface.co/onnx-community/mdbr-leaf-mt-ONNX/resolve/main/onnx/model_quantized.onnx_data"
+            "https://huggingface.co/MongoDB/mdbr-leaf-mt/resolve/main/onnx/model_quantized.onnx_data"
           curl -fSL -o models/vocab.txt \
-            "https://huggingface.co/onnx-community/mdbr-leaf-mt-ONNX/resolve/main/vocab.txt"
+            "https://huggingface.co/MongoDB/mdbr-leaf-mt/resolve/main/vocab.txt"
           curl -fSL -o models/2_Dense/model.safetensors \
             "https://huggingface.co/MongoDB/mdbr-leaf-mt/resolve/main/2_Dense/model.safetensors"
           curl -fSL -o models/2_Dense/config.json \

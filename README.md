@@ -257,7 +257,7 @@ Classification uses cosine similarity between the log's embedding vector and pre
 
 ## Embedding Model
 
-Lumber uses [MongoDB LEAF (mdbr-leaf-mt)](https://huggingface.co/onnx-community/mdbr-leaf-mt-ONNX), a 23M parameter text embedding model. Runs locally via ONNX Runtime — no external API calls, no GPU required.
+Lumber uses [MongoDB LEAF (mdbr-leaf-mt)](https://huggingface.co/MongoDB/mdbr-leaf-mt), a 23M parameter text embedding model. Runs locally via ONNX Runtime — no external API calls, no GPU required.
 
 | Property | Value |
 |---|---|

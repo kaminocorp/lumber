@@ -2,6 +2,7 @@
 
 ## Index
 
+- [0.8.0](#080--2026-03-09) — Model source consolidation: all downloads now use official `MongoDB/mdbr-leaf-mt` repo
 - [0.7.0](#070--2026-03-04) — Module rename: `hejijunhao/lumber` → `kaminocorp/lumber`, git remote migration
 - [0.6.0](#060--2026-02-28) — Output architecture & public library API: multi-output fan-out, async wrapper, file/webhook backends, `pkg/lumber` importable API
 - [0.5.1](#051--2026-02-24) — Post-review fixes: version stdout, timer leak, query validation, corpus test visibility, batch embed filtering
@@ -17,6 +18,35 @@
 - [0.2.1](#021--2026-02-19) — ONNX Runtime integration: session lifecycle, raw inference, dynamic tensor discovery
 - [0.2.0](#020--2026-02-19) — Model download pipeline: Makefile target, tokenizer config, vocab path
 - [0.1.0](#010--2026-02-19) — Project scaffolding: module structure, pipeline skeleton, classifier, compactor, and default taxonomy
+
+---
+
+## 0.8.0 — 2026-03-09
+
+**Model source consolidation — single official HuggingFace repo**
+
+All model download URLs consolidated from two HuggingFace repositories (`onnx-community/mdbr-leaf-mt-ONNX` + `MongoDB/mdbr-leaf-mt`) to the single official repo `MongoDB/mdbr-leaf-mt`, which now hosts the ONNX exports directly alongside the projection layer weights.
+
+### Changed
+
+- **Makefile** — consolidated 3 URL variables (`MODEL_REPO`, `MODEL_BASE`, `OFFICIAL_BASE`) into 1 (`MODEL_BASE`). All `make download-model` fetches now use `MongoDB/mdbr-leaf-mt`
+- **README.md** — embedding model HuggingFace link updated to official repo
+- **`docs/integration-guide.md`** — manual download curl commands updated. Fixed incorrect `Snowflake/mdbr-leaf-mt` URL for projection weights (was a copy-paste error, would have 404'd)
+- **`docs/blueprints/embedding-engine-blueprint.md`** — updated from "two HuggingFace repositories" to one
+- **`docs/executing/phase-9-distribution.md`** — CI workflow download URLs updated
+
+### Not changed
+
+- **`docs/changelog.md`** — historical entries retain original `onnx-community` references (accurate at time of writing)
+- **All Go source** — zero code changes. URLs only appear in docs and Makefile
+
+### Files changed
+
+| Category | Files |
+|----------|-------|
+| Makefile | 1 |
+| Documentation (`.md`) | 4 |
+| **Total** | **5** |
 
 ---
 
