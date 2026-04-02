@@ -2,7 +2,7 @@
 
 **Goal:** Make Lumber's first-run experience zero-friction. When a user installs Lumber and runs it with no configuration, an interactive wizard guides them through setup — selecting a log source, providing credentials (if cloud), and choosing output options. The wizard produces a fully populated `Config` that feeds into the existing pipeline startup path. Experienced users bypass the wizard entirely via flags/env vars.
 
-**Starting point:** `cmd/lumber/main.go` loads config from env vars + CLI flags, validates, and starts the pipeline. If no connector is configured, it defaults to `"vercel"` and immediately fails requiring an API key. There is no interactive mode, no stdin/file connector, and no guided setup.
+**Starting point:** `cmd/lumber/main.go` loads config from env vars + CLI flags, validates, and starts the pipeline. If no connector is configured, it defaults to `"vercel"` and immediately fails requiring an API key. There is no interactive mode, no stdin/file connector, and no guided setup. Model files and the ONNX Runtime shared library must already be present on disk — the auto-download logic in `pkg/lumber/download.go` is library-only and not accessible to the CLI binary.
 
 **Dependency:** `charmbracelet/huh` — a Go library for building interactive CLI forms. Provides select menus (arrow-key navigation), text inputs with validation, password masking, and styled output. Built on `bubbletea`/`lipgloss`. This is Lumber's first interactive-UI dependency.
 
@@ -16,6 +16,7 @@
 2. **No local log ingestion** — all three connectors require cloud provider credentials. There's no way to classify a local log file or piped input without a cloud account.
 3. **API key enforced for all connectors** — `config.go:178` requires `LUMBER_API_KEY` whenever any connector is set. Local connectors (stdin, file) don't need authentication.
 4. **No connector defaults to empty** — `config.go:66` defaults `Connector.Provider` to `"vercel"`. A bare `lumber` command should trigger the wizard, not attempt a Vercel connection.
+5. **Model files not auto-downloadable from the CLI** — the download logic (`downloadModels`, `downloadORT`, `fileValid`, `downloadFile`, `atomicWriteFromReader`, cache dir resolution) is locked inside `pkg/lumber/` (the library API). The CLI binary (`cmd/lumber/main.go`) constructs the embedder with raw file paths from `config.EngineConfig`. If the user installed via `go install` or `go build` (rather than a pre-built release tarball that bundles models), the wizard completes successfully but the pipeline immediately crashes with "model file not found". This is the worst possible UX — guided setup that ends in failure.
 
 ### Design principles
 
@@ -23,6 +24,7 @@
 - **Non-blocking for power users** — any flag or env var set → wizard is skipped entirely. The wizard is a fallback for unconfigured runs, not a gate.
 - **Config-compatible output** — the wizard produces a `Config` struct identical to what `LoadWithFlags()` produces. No special pipeline path.
 - **Graceful degradation** — if stdin is not a TTY (e.g., running in CI or piped input), skip the wizard and error with a helpful message listing required flags.
+- **Zero to functional** — the wizard owns the entire path from bare install to working pipeline, including model readiness. A user who follows the wizard must never hit a post-wizard crash.
 
 ---
 
@@ -43,7 +45,46 @@ This pulls in `huh` and its transitive dependencies (`bubbletea`, `lipgloss`, `b
 
 ---
 
-### Section 2: Stdin Connector
+### Section 2: Extract Download Logic to `internal/download/`
+
+**New file:** `internal/download/download.go`
+
+The download infrastructure currently lives in `pkg/lumber/download.go` — accessible only to library consumers via `WithAutoDownload()`. The CLI binary needs the same capability. Rather than duplicating the logic or having `cmd/lumber/main.go` import the public API package for an internal concern, extract the core download machinery to a shared internal package.
+
+**What moves from `pkg/lumber/download.go` to `internal/download/download.go`:**
+
+- `modelFile` struct and `modelFiles` slice (file manifest with URLs and SHA256 checksums)
+- `hfBase` and `ortVersion` constants
+- `DownloadModels(destDir string) error` — downloads all 5 model files, skipping any that are already cached and pass checksum verification
+- `DownloadORT(destDir string) error` — downloads platform-specific ONNX Runtime shared library
+- `OrtPlatform() (archiveSuffix, libName string, err error)` — platform detection
+- `FileValid(path, expectedSHA256 string) bool` — existence + checksum check
+- `DownloadFile(url, dest, expectedSHA256 string) error` — HTTP download with atomic write + hash-while-write
+- `AtomicWriteFromReader(dest string, r io.Reader) error` — temp file + rename
+- `downloadAndExtractORT` — streaming .tgz extraction
+- `DefaultCacheDir() (string, error)` — from `pkg/lumber/cache.go`, resolves `$LUMBER_CACHE_DIR` or OS-native cache path
+
+Functions that were unexported in `pkg/lumber/` become exported in `internal/download/` (they're internal to the module, so this is safe).
+
+**What stays in `pkg/lumber/`:**
+
+- `pkg/lumber/download.go` becomes a thin wrapper: imports `internal/download` and calls through. The `downloadModels`/`downloadORT` private functions in `pkg/lumber/lumber.go` call `download.DownloadModels()` etc.
+- `pkg/lumber/cache.go` becomes a one-liner calling `download.DefaultCacheDir()`.
+- The `WithAutoDownload()` / `WithCacheDir()` option API is unchanged — library consumers see no difference.
+
+**Why this split matters:**
+- `cmd/lumber/main.go` (via the wizard) can now call `download.DownloadModels()` and `download.DownloadORT()` directly
+- `pkg/lumber/` remains the public API, unchanged
+- No duplication of checksums, URLs, or download logic
+- Single place to bump model versions or change download sources
+
+**Test file:** `internal/download/download_test.go`
+
+Move the existing tests from `pkg/lumber/download_test.go` that test core download behavior (checksum validation, HTTP errors, atomic writes, platform detection). Tests that specifically test `pkg/lumber` option wiring stay in `pkg/lumber/download_test.go`.
+
+---
+
+### Section 3: Stdin Connector
 
 **New file:** `internal/connector/stdin/stdin.go`
 
@@ -94,7 +135,7 @@ The `init()` registration uses the default (no option). Tests use `WithReader()`
 
 ---
 
-### Section 3: File Connector
+### Section 4: File Connector
 
 **New file:** `internal/connector/file/file.go`
 
@@ -134,11 +175,11 @@ Tests:
 
 ---
 
-### Section 4: Config Validation Fixes
+### Section 5: Config Validation Fixes
 
 **File:** `internal/config/config.go`
 
-#### 4a: Change default connector to empty string
+#### 5a: Change default connector to empty string
 
 ```go
 // Before (line 66):
@@ -150,7 +191,7 @@ Provider: getenv("LUMBER_CONNECTOR", ""),
 
 An empty provider signals "not configured" and triggers the wizard.
 
-#### 4b: Skip API key validation for local connectors
+#### 5b: Skip API key validation for local connectors
 
 ```go
 // Before (line 178):
@@ -165,7 +206,7 @@ if c.Connector.Provider != "" && c.Connector.APIKey == "" && !localConnectors[c.
 }
 ```
 
-#### 4c: Add file connector validation
+#### 5c: Add file connector validation
 
 Add to `Validate()`:
 ```go
@@ -179,7 +220,7 @@ if c.Connector.Provider == "file" {
 }
 ```
 
-#### 4d: Add `-file` CLI flag and `LUMBER_FILE_PATH` env var
+#### 5d: Add `-file` CLI flag and `LUMBER_FILE_PATH` env var
 
 In `LoadWithFlags()`, add a new flag:
 ```go
@@ -200,7 +241,7 @@ In `Load()`, add to `loadConnectorExtra()`:
 {"LUMBER_FILE_PATH", "file"},
 ```
 
-#### 4e: Update config tests
+#### 5e: Update config tests
 
 **File:** `internal/config/config_test.go`
 
@@ -213,7 +254,7 @@ New tests:
 
 ---
 
-### Section 5: Wizard Implementation
+### Section 6: Wizard Implementation
 
 **New file:** `internal/cli/wizard.go`
 
@@ -227,7 +268,80 @@ package cli
 func RunWizard(base config.Config) (config.Config, error)
 ```
 
-#### Step 1: Welcome + Source Selection
+#### Form 1: Model Readiness
+
+Before asking anything about log sources, the wizard checks whether model files and the ONNX Runtime library are available. This is the most critical step — without models, nothing works.
+
+**Detection logic:**
+```go
+func modelsReady(cfg config.Config) bool {
+    for _, path := range []string{cfg.Engine.ModelPath, cfg.Engine.VocabPath, cfg.Engine.ProjectionPath} {
+        if _, err := os.Stat(path); os.IsNotExist(err) {
+            return false
+        }
+    }
+    // Also check ORT library in the model directory or standard locations.
+    _, libName, err := download.OrtPlatform()
+    if err != nil {
+        return false
+    }
+    ortDir := filepath.Dir(cfg.Engine.ModelPath)
+    if _, err := os.Stat(filepath.Join(ortDir, libName)); err == nil {
+        return true
+    }
+    // Check cache dir as fallback.
+    cacheDir, err := download.DefaultCacheDir()
+    if err != nil {
+        return false
+    }
+    _, err = os.Stat(filepath.Join(cacheDir, libName))
+    return err == nil
+}
+```
+
+**If models are missing — interactive download prompt:**
+
+```go
+huh.NewConfirm().
+    Title("Model files not found").
+    Description("Lumber needs embedding model files (~50MB) and the ONNX Runtime library (~15MB) to classify logs. Download them now?").
+    Affirmative("Yes, download").
+    Negative("No, exit").
+    Value(&shouldDownload)
+```
+
+If the user confirms, download to the cache directory using `internal/download`:
+```go
+cacheDir, _ := download.DefaultCacheDir()
+fmt.Fprintf(os.Stderr, "  Downloading model files to %s ...\n", cacheDir)
+if err := download.DownloadModels(cacheDir); err != nil {
+    return cfg, fmt.Errorf("model download failed: %w", err)
+}
+fmt.Fprintf(os.Stderr, "  Downloading ONNX Runtime ...\n")
+if err := download.DownloadORT(cacheDir); err != nil {
+    return cfg, fmt.Errorf("ORT download failed: %w", err)
+}
+// Update config to point at cached models.
+cfg.Engine.ModelPath = filepath.Join(cacheDir, "model_quantized.onnx")
+cfg.Engine.VocabPath = filepath.Join(cacheDir, "vocab.txt")
+cfg.Engine.ProjectionPath = filepath.Join(cacheDir, "2_Dense", "model.safetensors")
+fmt.Fprintf(os.Stderr, "  %s\n\n", successStyle.Render("✓ Models ready"))
+```
+
+If the user declines, exit with a message pointing to manual download:
+```
+Model files are required. To download manually:
+  make download-model    (from source checkout)
+  See: https://github.com/kaminocorp/lumber#install
+```
+
+**If models are already present** — skip this step silently (no prompt, no message). The user doesn't need to know about this machinery when it's not relevant.
+
+**Non-wizard path:** When the wizard is not running (flags/env vars set), the same `modelsReady()` check runs in `main.go` before validation. If models are missing and stdin is a TTY, print a one-liner suggesting the download flag. If not a TTY, print the error with the manual download instructions. This ensures even non-wizard users get a clear path to resolution. See Section 7 for details.
+
+---
+
+#### Form 2: Source Selection
 
 ```go
 huh.NewSelect[string]().
@@ -239,7 +353,7 @@ huh.NewSelect[string]().
     Value(&source)
 ```
 
-#### Step 2a: Local Path — Sub-selection
+#### Form 2a: Local Path — Sub-selection
 
 If `source == "local"`:
 
@@ -270,7 +384,7 @@ huh.NewInput().
 
 If `"stdin"` → set connector to `"stdin"`, skip further source prompts. Print a note: "Waiting for piped input... (usage: cat app.log | lumber)"
 
-#### Step 2b: Cloud Path — Provider + Credentials
+#### Form 2b: Cloud Path — Provider + Credentials
 
 If `source == "cloud"`:
 
@@ -318,10 +432,45 @@ huh.NewInput().Title("App name:").Validate(notEmpty).Value(&appName)
 huh.NewInput().Title("Project ref:").Validate(notEmpty).Value(&projectRef)
 ```
 
-#### Step 3: Shared Options
+#### Form 3: Output Options
 
-Both local and cloud paths converge here:
+Both local and cloud paths converge here.
 
+**Output destination:**
+```go
+huh.NewMultiSelect[string]().
+    Title("Output destinations:").
+    Description("Stdout is always enabled. Select additional outputs:").
+    Options(
+        huh.NewOption("File (NDJSON)", "file"),
+        huh.NewOption("Webhook (HTTP POST)", "webhook"),
+    ).
+    Value(&extraOutputs)
+```
+
+If `"file"` selected:
+```go
+huh.NewInput().
+    Title("Output file path:").
+    Placeholder("lumber-output.ndjson").
+    Value(&outputFilePath)
+```
+
+If `"webhook"` selected:
+```go
+huh.NewInput().
+    Title("Webhook URL:").
+    Placeholder("https://example.com/logs").
+    Validate(func(s string) error {
+        if !strings.HasPrefix(s, "http://") && !strings.HasPrefix(s, "https://") {
+            return fmt.Errorf("URL must start with http:// or https://")
+        }
+        return nil
+    }).
+    Value(&webhookURL)
+```
+
+**Verbosity:**
 ```go
 huh.NewSelect[string]().
     Title("Output verbosity:").
@@ -350,7 +499,43 @@ huh.NewInput().Title("From (RFC3339):").Placeholder("2026-01-01T00:00:00Z").Valu
 huh.NewInput().Title("To (RFC3339):").Placeholder("2026-01-01T01:00:00Z").Value(&to)
 ```
 
-#### Step 4: Build Config
+#### Form 4: Summary Confirmation
+
+After all inputs are collected, display a summary and ask for confirmation before launching the pipeline. This gives the user a chance to spot mistakes and builds confidence that the wizard understood their intent.
+
+```go
+summary := buildSummary(provider, mode, verbosity, extraOutputs, outputFilePath, webhookURL)
+
+huh.NewConfirm().
+    Title("Ready to start").
+    Description(summary).
+    Affirmative("Start").
+    Negative("Cancel").
+    Value(&confirmed)
+```
+
+The `buildSummary` function renders a compact overview:
+```go
+func buildSummary(provider, mode, verbosity string, outputs []string, filePath, webhookURL string) string {
+    var b strings.Builder
+    fmt.Fprintf(&b, "  Source:     %s\n", provider)
+    fmt.Fprintf(&b, "  Mode:       %s\n", mode)
+    fmt.Fprintf(&b, "  Verbosity:  %s\n", verbosity)
+    out := "stdout"
+    if slices.Contains(outputs, "file") {
+        out += " + file (" + filePath + ")"
+    }
+    if slices.Contains(outputs, "webhook") {
+        out += " + webhook"
+    }
+    fmt.Fprintf(&b, "  Output:     %s", out)
+    return b.String()
+}
+```
+
+If the user cancels, the wizard returns an error and main.go exits cleanly.
+
+#### Build Config
 
 Map all wizard responses into the `base` Config struct and return it. The caller (`main.go`) proceeds with the normal validation + pipeline startup.
 
@@ -359,27 +544,33 @@ cfg.Connector.Provider = provider
 cfg.Connector.APIKey = apiKey
 cfg.Engine.Verbosity = verbosity
 cfg.Mode = mode
+cfg.Output.FilePath = outputFilePath
+cfg.Output.WebhookURL = webhookURL
+cfg.Output.Pretty = true // TTY sessions default to pretty output
 // ... etc
 return cfg, nil
 ```
+
+**Pretty-print default:** When the wizard runs (which means stdout is a TTY), default `Output.Pretty` to `true`. Users running interactively will see readable, indented JSON rather than compressed NDJSON. This is the right default for someone exploring Lumber for the first time — they can switch to non-pretty via the `-pretty=false` flag or `LUMBER_OUTPUT_PRETTY=false` env var in production.
 
 #### Grouping prompts into forms
 
 Use `huh.NewForm()` to group related prompts into multi-field forms where it makes sense. Each form is one "screen" in the wizard. This keeps the interaction tight rather than one-question-at-a-time:
 
-- **Form 1:** Source selection (local vs cloud)
-- **Form 2:** Source details (file path, or provider + API key + extras)
-- **Form 3:** Options (verbosity, mode, query range)
+- **Form 1:** Model readiness check + download (only if needed)
+- **Form 2:** Source selection (local vs cloud) + source details (file path, or provider + API key + extras)
+- **Form 3:** Output options (destinations, verbosity, mode, query range)
+- **Form 4:** Summary confirmation
 
 Each form runs as `form.Run()` — the user sees all fields in the group, fills them, confirms.
 
 ---
 
-### Section 6: Wizard Integration in main.go
+### Section 7: Wizard Integration in main.go
 
 **File:** `cmd/lumber/main.go`
 
-#### 6a: Detect "unconfigured" state
+#### 7a: Detect "unconfigured" state
 
 After `cfg := config.LoadWithFlags()` and before validation, check whether the wizard should run:
 
@@ -430,7 +621,41 @@ This enables the convenient pipe-without-flags pattern:
 cat app.log | lumber    # auto-detects stdin, no -connector flag needed
 ```
 
-#### 6b: Import new connector packages
+#### 7b: Non-wizard model readiness check
+
+When the wizard is **not** running (the user set flags/env vars and bypassed it), model files may still be missing — particularly for `go install` users who don't know about `make download-model`. Add a pre-validation check that provides a clear resolution path:
+
+```go
+// After wizard block, before cfg.Validate():
+if !modelsReady(cfg) {
+    if isTerminal(os.Stdin) {
+        fmt.Fprintf(os.Stderr, "Model files not found. Run 'lumber' with no flags to launch the setup wizard,\n")
+        fmt.Fprintf(os.Stderr, "or download manually: make download-model\n")
+    } else {
+        fmt.Fprintf(os.Stderr, "Model files not found at configured paths.\n")
+        fmt.Fprintf(os.Stderr, "Download with: make download-model && make download-ort\n")
+        fmt.Fprintf(os.Stderr, "Or set LUMBER_MODEL_PATH, LUMBER_VOCAB_PATH, LUMBER_PROJECTION_PATH\n")
+    }
+    os.Exit(1)
+}
+```
+
+This replaces the current failure mode (config validation fails with three separate "file not found" errors for each model path) with a single, actionable message.
+
+**Note:** The `modelsReady()` helper is defined in `internal/cli/wizard.go` and also used here. It can be exported as `cli.ModelsReady(cfg)`.
+
+#### 7c: Set ORT library path from cache
+
+When models were auto-downloaded (either by the wizard or in a previous run), the ONNX Runtime library lives in the cache directory, not next to the binary. The embedder needs to find it. After the wizard (or non-wizard model check), if the model paths point to the cache directory, set `DYLD_LIBRARY_PATH` / `LD_LIBRARY_PATH` to include the cache dir so ORT discovers the shared library:
+
+```go
+// Already handled by the embedder's ortLibraryName() + ort.SetSharedLibraryPath()
+// We just need to call ort.SetSharedLibraryPath() with the cache dir's ORT path.
+```
+
+This may require a small addition to the embedder initialization to accept an optional ORT library path override. If the model directory is the cache dir, pass the ORT path explicitly. The exact wiring depends on how `onnxruntime-go` resolves library paths — investigate during implementation.
+
+#### 7d: Import new connector packages
 
 Add blank imports for the new connectors:
 ```go
@@ -438,7 +663,7 @@ _ "github.com/kaminocorp/lumber/internal/connector/stdin"
 _ "github.com/kaminocorp/lumber/internal/connector/file"
 ```
 
-#### 6c: Print startup banner
+#### 7e: Print startup banner
 
 Before the wizard (or before pipeline start if wizard is skipped), print a minimal banner:
 
@@ -450,7 +675,7 @@ Using `os.Stderr` so it doesn't mix with NDJSON output on stdout.
 
 ---
 
-### Section 7: Welcome Header & Styled Output
+### Section 8: Welcome Header & Styled Output
 
 **New file:** `internal/cli/style.go`
 
@@ -476,7 +701,7 @@ func printHeader(version string) {
 }
 ```
 
-Post-wizard confirmation:
+Post-wizard confirmation (shown after the summary Form 4 is accepted):
 ```go
 func printReady(provider, mode string) {
     fmt.Fprintf(os.Stderr, "\n  %s %s → %s\n\n",
@@ -489,7 +714,7 @@ func printReady(provider, mode string) {
 
 ---
 
-### Section 8: Tests
+### Section 9: Tests
 
 **New file:** `internal/cli/wizard_test.go`
 
@@ -502,6 +727,24 @@ Tests:
 4. **Cloud Fly.io path** — simulate cloud → flyio → API key → app name. Verify `Extra["app_name"]` set.
 5. **Cloud Supabase path** — simulate cloud → supabase → API key → project ref. Verify `Extra["project_ref"]` set.
 6. **File validation** — simulate file path to nonexistent file, verify validation error triggers re-prompt.
+7. **Output file selected** — simulate selecting file output → provide path. Verify `Output.FilePath` set.
+8. **Webhook selected** — simulate selecting webhook → provide URL. Verify `Output.WebhookURL` set.
+9. **Pretty-print default** — verify wizard-produced config has `Output.Pretty = true`.
+10. **Summary cancel** — simulate declining the summary confirmation. Verify wizard returns an error.
+
+**New file:** `internal/download/download_test.go`
+
+Migrated from `pkg/lumber/download_test.go` (tests for the core download logic):
+1. `TestDefaultCacheDir` — `LUMBER_CACHE_DIR` override and OS fallback.
+2. `TestFileValid` — non-existent, no-checksum, matching, mismatched checksums.
+3. `TestDownloadFile` — happy path with SHA256 verification via httptest.
+4. `TestDownloadFile_ChecksumMismatch` — corrupt download rejected, temp file cleaned up.
+5. `TestDownloadFile_HTTPError` — HTTP 404 surfaces as error.
+6. `TestDownloadFile_SkipsIfCached` — valid cached file not re-downloaded.
+7. `TestDownloadFile_SubdirectoryCreated` — nested parent dirs created (e.g., `2_Dense/`).
+8. `TestDownloadFile_CorruptCacheRedownloaded` — corrupt cached file detected and replaced.
+9. `TestOrtPlatform` — platform detection matches current `GOOS`/`GOARCH`.
+10. `TestAtomicWriteFromReader` — temp file + rename produces correct output.
 
 **Integration test in `cmd/lumber/`:**
 
@@ -512,7 +755,7 @@ A test that verifies the auto-detect logic:
 
 ---
 
-### Section 9: Update Flag Usage Text
+### Section 10: Update Flag Usage Text
 
 **File:** `internal/config/config.go`
 
@@ -548,23 +791,28 @@ Environment variables:
 
 ---
 
-### Section 10: Version Bump & Docs
+### Section 11: Version Bump & Docs
 
 **File:** `internal/config/config.go`
 
 ```go
-const Version = "0.9.0"
+var Version = "0.10.0"
 ```
 
 **File:** `docs/changelog.md`
 
 New entry at top documenting:
 - Interactive setup wizard on first run
+- Model readiness check with auto-download (reuses Phase 9.5 download infrastructure)
 - stdin connector (pipe any logs through Lumber)
 - file connector (classify a local log file)
 - Auto-detection of piped stdin input
+- Output destination selection (file, webhook) in wizard
+- Summary confirmation screen before pipeline launch
+- Pretty-print default for TTY sessions
 - Config validation fix: local connectors no longer require API key
 - Default connector changed from `"vercel"` to empty (triggers wizard)
+- Download logic extracted to `internal/download/` (shared by CLI and library)
 - New dependency: `charmbracelet/huh`
 
 **File:** `README.md`
@@ -578,20 +826,25 @@ Update quick-start section to show the wizard flow and pipe usage.
 | File | Action | Section |
 |------|--------|---------|
 | `go.mod` / `go.sum` | modified | 1 |
-| `internal/connector/stdin/stdin.go` | **new** | 2 |
-| `internal/connector/stdin/stdin_test.go` | **new** | 2 |
-| `internal/connector/file/file.go` | **new** | 3 |
-| `internal/connector/file/file_test.go` | **new** | 3 |
-| `internal/config/config.go` | modified | 4, 9 |
-| `internal/config/config_test.go` | modified | 4 |
-| `internal/cli/wizard.go` | **new** | 5 |
-| `internal/cli/style.go` | **new** | 7 |
-| `internal/cli/wizard_test.go` | **new** | 8 |
-| `cmd/lumber/main.go` | modified | 6 |
-| `docs/changelog.md` | modified | 10 |
-| `README.md` | modified | 10 |
+| `internal/download/download.go` | **new** | 2 |
+| `internal/download/download_test.go` | **new** | 2 |
+| `pkg/lumber/download.go` | modified | 2 |
+| `pkg/lumber/cache.go` | modified | 2 |
+| `pkg/lumber/download_test.go` | modified | 2 |
+| `internal/connector/stdin/stdin.go` | **new** | 3 |
+| `internal/connector/stdin/stdin_test.go` | **new** | 3 |
+| `internal/connector/file/file.go` | **new** | 4 |
+| `internal/connector/file/file_test.go` | **new** | 4 |
+| `internal/config/config.go` | modified | 5, 10 |
+| `internal/config/config_test.go` | modified | 5 |
+| `internal/cli/wizard.go` | **new** | 6 |
+| `internal/cli/style.go` | **new** | 8 |
+| `internal/cli/wizard_test.go` | **new** | 9 |
+| `cmd/lumber/main.go` | modified | 7 |
+| `docs/changelog.md` | modified | 11 |
+| `README.md` | modified | 11 |
 
-**New files: 7. Modified files: 6. Total: 13.**
+**New files: 9. Modified files: 9. Total: 18.**
 
 ---
 
@@ -600,16 +853,22 @@ Update quick-start section to show the wizard flow and pipe usage.
 After implementation, verify:
 
 - [ ] `go build ./...` — compiles cleanly
-- [ ] `go test ./...` — all tests pass
-- [ ] `lumber` with no config → wizard launches (TTY)
+- [ ] `go test ./...` — all tests pass (including migrated download tests)
+- [ ] `lumber` with no config, no models → wizard prompts to download models → downloads → proceeds to source selection
+- [ ] `lumber` with no config, models present → wizard skips model step, goes straight to source selection
 - [ ] `lumber` with no config → helpful error message (non-TTY, no pipe)
 - [ ] `cat testfile.log | lumber` → auto-detects stdin, classifies lines
 - [ ] `lumber -connector stdin < testfile.log` → same behavior
 - [ ] `lumber -connector file -file testfile.log` → reads file, classifies
 - [ ] `lumber -connector vercel` without API key → validation error
 - [ ] `lumber -connector stdin` → no API key error
+- [ ] `lumber -connector vercel` without models (non-TTY) → clear "model files not found" message with instructions
 - [ ] `lumber --version` → prints version, no wizard
 - [ ] `lumber --help` → updated usage text
-- [ ] Wizard: local → file → valid path → starts pipeline
+- [ ] Wizard: local → file → valid path → stdout + file output → summary → starts pipeline
 - [ ] Wizard: local → stdin → prompts for piped input
-- [ ] Wizard: cloud → vercel → API key → starts pipeline
+- [ ] Wizard: cloud → vercel → API key → summary → starts pipeline
+- [ ] Wizard: summary → cancel → exits cleanly
+- [ ] Wizard-produced config has `Output.Pretty = true`
+- [ ] `pkg/lumber` library API unchanged — `WithAutoDownload()` still works identically
+- [ ] Download tests pass in both `internal/download/` and `pkg/lumber/`
