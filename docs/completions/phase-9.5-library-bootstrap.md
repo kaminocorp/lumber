@@ -177,7 +177,7 @@ var Version = "0.8.1"
 var Version = "0.9.0"
 ```
 
-This aligns the default version with the planned semver tag. When `git tag -a v0.9.0` is created and the release workflow runs, the build injects the same version via `-ldflags`.
+This aligns the default version with the `v0.9.1` semver tag. The release workflow injects the same version via `-ldflags`.
 
 ---
 
@@ -202,7 +202,7 @@ Added `Example_autoDownload()` — a runnable godoc example gated behind `LUMBER
 #### `README.md`
 
 Rewrote the "Library Usage" section:
-- Version-pinned `go get` command: `go get github.com/kaminocorp/lumber@v0.9.0`
+- Version-pinned `go get` command: `go get github.com/kaminocorp/lumber@v0.9.1`
 - **Auto-download** subsection (recommended for getting started) showing `WithAutoDownload()`
 - **Pre-downloaded models** subsection (recommended for production/Docker) showing `WithModelDir()`
 - Existing batch, structured input, and taxonomy introspection examples preserved unchanged
@@ -286,7 +286,7 @@ go test ./...    — 22 packages pass (0 failures)
 
 ## What's Left (Deferred Per Plan)
 
-- **Semver tag** — `git tag -a v0.9.0 -m "..."` + `git push origin v0.9.0`. Manual step, ready to execute.
+- **Semver tag** — `git tag -a v0.9.1 -m "..."` + `git push origin v0.9.1`. Manual step, ready to execute.
 - **Auto-update mechanism** — checking for newer model versions. v1 uses pinned checksums.
 - **Download progress callback** — `WithProgressFunc(func(downloaded, total int64))` for UI consumers.
 - **ORT system-level detection** — checking `ldconfig`/`pkg-config` before downloading a private copy.

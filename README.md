@@ -294,7 +294,7 @@ Lumber uses [MongoDB LEAF (mdbr-leaf-mt)](https://huggingface.co/MongoDB/mdbr-le
 Lumber can be imported as a Go library. Classify log text directly in your application — no subprocess, no stdout parsing.
 
 ```bash
-go get github.com/kaminocorp/lumber@v0.9.0
+go get github.com/kaminocorp/lumber@v0.9.1
 ```
 
 ```go

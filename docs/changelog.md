@@ -2,7 +2,7 @@
 
 ## Index
 
-- [0.9.1](#091--2026-04-02) — Library bootstrap: auto-download models + ORT on first use, OS-aware cache, `WithAutoDownload()` API, version bump to 0.9.0
+- [0.9.1](#091--2026-04-02) — Library bootstrap: auto-download models + ORT on first use, OS-aware cache, `WithAutoDownload()` API
 - [0.9.0](#090--2026-04-02) — Distribution & release pipeline: platform-aware ORT, version injection, multi-platform Makefile, GitHub Release workflow
 - [0.8.0](#080--2026-03-09) — Model source consolidation: all downloads now use official `MongoDB/mdbr-leaf-mt` repo
 - [0.7.0](#070--2026-03-04) — Module rename: `hejijunhao/lumber` → `kaminocorp/lumber`, git remote migration
@@ -41,8 +41,8 @@ Makes Lumber usable as a Go library dependency without manual model setup. `go g
 ### Changed
 
 - **`New()` wiring** — `pkg/lumber/lumber.go` now invokes `downloadModels` + `downloadORT` before `resolvePaths` when `autoDownload` is set and no explicit model paths are provided. After download, sets `o.modelDir` to the cache directory so downstream path resolution works unchanged.
-- **Version bump** — `internal/config/config.go` default version `"0.8.1"` → `"0.9.0"` to align with the planned semver tag.
-- **README.md** — Library Usage section rewritten. `go get` command now version-pinned to `@v0.9.0`. Two subsections: "Auto-download (recommended for getting started)" showing `WithAutoDownload()`, and "Pre-downloaded models (recommended for production/Docker)" showing `WithModelDir()`.
+- **Version bump** — `internal/config/config.go` default version `"0.8.1"` → `"0.9.1"`.
+- **README.md** — Library Usage section rewritten. `go get` command now version-pinned to `@v0.9.1`. Two subsections: "Auto-download (recommended for getting started)" showing `WithAutoDownload()`, and "Pre-downloaded models (recommended for production/Docker)" showing `WithModelDir()`.
 - **`pkg/lumber/doc.go`** — Package-level godoc quick-start updated to show `WithAutoDownload()` as the primary path, with a note about cache location and a second example for pre-downloaded models.
 
 ### Design decisions
