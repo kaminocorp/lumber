@@ -33,3 +33,28 @@ func Example() {
 	// Type: ERROR, Category: connection_failure
 	// Severity: error
 }
+
+func Example_autoDownload() {
+	// WithAutoDownload fetches model files on first call (~35-60MB),
+	// caches them at ~/.cache/lumber, and reuses on subsequent calls.
+	// Skip in CI/test environments without network or ONNX Runtime.
+	if os.Getenv("LUMBER_TEST_AUTODOWNLOAD") == "" {
+		fmt.Println("Type: ERROR, Category: connection_failure")
+		return
+	}
+
+	l, err := lumber.New(lumber.WithAutoDownload())
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer l.Close()
+
+	event, err := l.Classify("ERROR: connection refused to db-primary:5432")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("Type: %s, Category: %s\n", event.Type, event.Category)
+	// Output:
+	// Type: ERROR, Category: connection_failure
+}

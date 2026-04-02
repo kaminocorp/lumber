@@ -294,18 +294,19 @@ Lumber uses [MongoDB LEAF (mdbr-leaf-mt)](https://huggingface.co/MongoDB/mdbr-le
 Lumber can be imported as a Go library. Classify log text directly in your application — no subprocess, no stdout parsing.
 
 ```bash
-go get github.com/kaminocorp/lumber
+go get github.com/kaminocorp/lumber@v0.9.0
 ```
 
 ```go
 import "github.com/kaminocorp/lumber/pkg/lumber"
 ```
 
-### Basic classification
+### Auto-download (recommended for getting started)
 
 ```go
-// Load once at startup (~100-300ms)
-l, err := lumber.New(lumber.WithModelDir("models/"))
+// Downloads ~35-60MB of model files on first call.
+// Cached at ~/.cache/lumber — subsequent calls are instant.
+l, err := lumber.New(lumber.WithAutoDownload())
 if err != nil {
     log.Fatal(err)
 }
@@ -313,6 +314,17 @@ defer l.Close()
 
 event, _ := l.Classify("ERROR: connection refused to db-primary:5432")
 fmt.Println(event.Type, event.Category) // ERROR connection_failure
+```
+
+### Pre-downloaded models (recommended for production/Docker)
+
+```go
+// Use make download-model or Dockerfile curl stage to prepare the directory.
+l, err := lumber.New(lumber.WithModelDir("/opt/lumber/models"))
+if err != nil {
+    log.Fatal(err)
+}
+defer l.Close()
 ```
 
 ### Batch classification

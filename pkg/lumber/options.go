@@ -9,6 +9,8 @@ type options struct {
 	projectionPath      string
 	confidenceThreshold float64
 	verbosity           string
+	autoDownload        bool
+	cacheDir            string
 }
 
 // Option configures a Lumber instance.
@@ -45,6 +47,28 @@ func WithConfidenceThreshold(t float64) Option {
 func WithVerbosity(v string) Option {
 	return func(o *options) {
 		o.verbosity = v
+	}
+}
+
+// WithAutoDownload enables automatic model and ONNX Runtime download.
+// On first call, downloads ~35-60MB of files to the OS cache directory
+// (or the directory specified by WithCacheDir). Subsequent calls reuse
+// the cached files. Requires network access on first run only.
+//
+// When combined with WithModelDir or WithModelPaths, those take precedence
+// and no download is attempted.
+func WithAutoDownload() Option {
+	return func(o *options) {
+		o.autoDownload = true
+	}
+}
+
+// WithCacheDir overrides the default cache directory for auto-downloaded files.
+// Only relevant when WithAutoDownload is used. Default: ~/.cache/lumber (Linux),
+// ~/Library/Caches/lumber (macOS).
+func WithCacheDir(dir string) Option {
+	return func(o *options) {
+		o.cacheDir = dir
 	}
 }
 

@@ -2,6 +2,7 @@ package lumber
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/kaminocorp/lumber/internal/engine"
@@ -28,6 +29,28 @@ func New(opts ...Option) (*Lumber, error) {
 	o := defaultOptions()
 	for _, opt := range opts {
 		opt(&o)
+	}
+
+	// Auto-download models + ORT if requested and no explicit paths provided.
+	if o.autoDownload && o.modelDir == "" && o.modelPath == "" {
+		cacheDir := o.cacheDir
+		if cacheDir == "" {
+			var err error
+			cacheDir, err = defaultCacheDir()
+			if err != nil {
+				return nil, fmt.Errorf("lumber: %w", err)
+			}
+		}
+		if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+			return nil, fmt.Errorf("lumber: creating cache dir: %w", err)
+		}
+		if err := downloadModels(cacheDir); err != nil {
+			return nil, fmt.Errorf("lumber: %w", err)
+		}
+		if err := downloadORT(cacheDir); err != nil {
+			return nil, fmt.Errorf("lumber: %w", err)
+		}
+		o.modelDir = cacheDir
 	}
 
 	modelPath, vocabPath, projPath := resolvePaths(o)

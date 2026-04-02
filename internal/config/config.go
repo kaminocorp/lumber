@@ -11,7 +11,7 @@ import (
 
 // Version is the current Lumber release version.
 // Set at build time via: go build -ldflags "-X github.com/kaminocorp/lumber/internal/config.Version=X.Y.Z"
-var Version = "0.8.1"
+var Version = "0.9.0"
 
 // Config holds all Lumber configuration.
 type Config struct {

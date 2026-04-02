@@ -2,6 +2,7 @@
 
 ## Index
 
+- [0.9.1](#091--2026-04-02) — Library bootstrap: auto-download models + ORT on first use, OS-aware cache, `WithAutoDownload()` API, version bump to 0.9.0
 - [0.9.0](#090--2026-04-02) — Distribution & release pipeline: platform-aware ORT, version injection, multi-platform Makefile, GitHub Release workflow
 - [0.8.0](#080--2026-03-09) — Model source consolidation: all downloads now use official `MongoDB/mdbr-leaf-mt` repo
 - [0.7.0](#070--2026-03-04) — Module rename: `hejijunhao/lumber` → `kaminocorp/lumber`, git remote migration
@@ -19,6 +20,88 @@
 - [0.2.1](#021--2026-02-19) — ONNX Runtime integration: session lifecycle, raw inference, dynamic tensor discovery
 - [0.2.0](#020--2026-02-19) — Model download pipeline: Makefile target, tokenizer config, vocab path
 - [0.1.0](#010--2026-02-19) — Project scaffolding: module structure, pipeline skeleton, classifier, compactor, and default taxonomy
+
+---
+
+## 0.9.1 — 2026-04-02
+
+**Library bootstrap & versioning (Phase 9.5)**
+
+Makes Lumber usable as a Go library dependency without manual model setup. `go get github.com/kaminocorp/lumber` + `lumber.New(lumber.WithAutoDownload())` now works out of the box — model files and the ONNX Runtime shared library are fetched on first use, cached locally, and reused across runs. Solves the onboarding friction observed with Heimdall (first library consumer), where integrators had to replicate download logic from the Makefile in Dockerfiles and had no local-dev path.
+
+### Added
+
+- **Auto-download for model files** — `pkg/lumber/download.go` downloads 5 model files from HuggingFace (`MongoDB/mdbr-leaf-mt`) to an OS-appropriate cache directory on first `New(WithAutoDownload())` call. SHA256 checksums embedded in the binary verify integrity. Files are written via temp-file + atomic `os.Rename` to prevent partial downloads from being used. Subsequent calls skip download if cached files pass checksum.
+- **Auto-download for ONNX Runtime** — same file downloads the platform-specific ORT shared library (~8-35MB) from Microsoft's GitHub Releases (`v1.24.1`). Streams the `.tgz` archive through `gzip.NewReader` → `tar.NewReader`, selectively extracts only the versioned shared library (skips headers, static libs, symlinks). Supports `linux-amd64`, `linux-arm64`, `darwin-arm64`. Unsupported platforms get a clear error pointing to `WithModelDir()`.
+- **Cache directory resolution** — `pkg/lumber/cache.go` determines the cache path via `$LUMBER_CACHE_DIR` (explicit override) or `os.UserCacheDir()/lumber` (platform-native: `~/Library/Caches/lumber` on macOS, `~/.cache/lumber` on Linux). Cache layout mirrors the existing model directory structure.
+- **`WithAutoDownload()` option** — `pkg/lumber/options.go` adds opt-in auto-download. Default behavior (expect local files) is unchanged. Precedence: `WithModelPaths` > `WithModelDir` > `WithAutoDownload` > error.
+- **`WithCacheDir(dir)` option** — overrides the default cache directory when auto-download is active.
+- **Auto-download example** — `pkg/lumber/example_test.go` gains `Example_autoDownload()`, gated behind `LUMBER_TEST_AUTODOWNLOAD` env var for CI safety.
+
+### Changed
+
+- **`New()` wiring** — `pkg/lumber/lumber.go` now invokes `downloadModels` + `downloadORT` before `resolvePaths` when `autoDownload` is set and no explicit model paths are provided. After download, sets `o.modelDir` to the cache directory so downstream path resolution works unchanged.
+- **Version bump** — `internal/config/config.go` default version `"0.8.1"` → `"0.9.0"` to align with the planned semver tag.
+- **README.md** — Library Usage section rewritten. `go get` command now version-pinned to `@v0.9.0`. Two subsections: "Auto-download (recommended for getting started)" showing `WithAutoDownload()`, and "Pre-downloaded models (recommended for production/Docker)" showing `WithModelDir()`.
+- **`pkg/lumber/doc.go`** — Package-level godoc quick-start updated to show `WithAutoDownload()` as the primary path, with a note about cache location and a second example for pre-downloaded models.
+
+### Design decisions
+
+- **Opt-in, not default.** Implicit network calls in a constructor are surprising and break in air-gapped environments. Auto-download only activates with explicit `WithAutoDownload()`.
+- **Checksums embedded, not fetched.** Prevents TOCTOU between remote check and download. Model version is pinned to Lumber version — updating models requires a version bump. Intentional: prevents silent model drift, keeps classification deterministic per version.
+- **`io.MultiWriter` for hash-while-write.** Computes SHA256 during download in a single pass — no second disk read. Saves ~23MB of I/O for the largest file.
+- **Streaming ORT extraction.** Archives are 8-35MB. Rather than download-to-disk then extract, we stream `http.Get` → `gzip` → `tar` → `atomicWrite`. Constant memory, no temporary archive files.
+- **No ORT checksum.** URL includes exact version; corrupt downloads fail at `ort.InitializeEnvironment()` with a clear error. Per-platform checksum table not justified by risk.
+- **Atomic writes for concurrency safety.** Temp file + `os.Rename` means concurrent `New(WithAutoDownload())` calls race harmlessly. Last rename wins with a valid copy.
+
+### New environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LUMBER_CACHE_DIR` | (OS-specific, see above) | Override cache directory for auto-downloaded model files |
+
+### Tests added
+
+| File | Tests | What |
+|------|-------|------|
+| `pkg/lumber/download_test.go` | `TestDefaultCacheDir` | `LUMBER_CACHE_DIR` override and OS fallback |
+| | `TestFileValid` | Non-existent, no-checksum, matching, mismatched checksums |
+| | `TestDownloadFile` | Happy path with SHA256 verification via httptest |
+| | `TestDownloadFile_ChecksumMismatch` | Corrupt download rejected, temp file cleaned up |
+| | `TestDownloadFile_HTTPError` | HTTP 404 surfaces as error |
+| | `TestDownloadFile_SkipsIfCached` | Valid cached file not re-downloaded |
+| | `TestDownloadFile_SubdirectoryCreated` | Nested parent dirs created (e.g., `2_Dense/`) |
+| | `TestDownloadFile_CorruptCacheRedownloaded` | Corrupt cached file detected and replaced |
+| | `TestOrtPlatform` | Platform detection matches current `GOOS`/`GOARCH` |
+| | `TestAtomicWriteFromReader` | Temp file + rename produces correct output |
+
+### Files changed
+
+| File | Action | What |
+|------|--------|------|
+| `pkg/lumber/cache.go` | **new** | Cache directory resolution |
+| `pkg/lumber/download.go` | **new** | Model + ORT downloader with checksum verification |
+| `pkg/lumber/download_test.go` | **new** | 10 tests covering all download behaviors |
+| `pkg/lumber/options.go` | modified | `WithAutoDownload()`, `WithCacheDir()` options |
+| `pkg/lumber/lumber.go` | modified | Auto-download block in `New()` |
+| `internal/config/config.go` | modified | Version bump to `0.9.0` |
+| `pkg/lumber/doc.go` | modified | Updated quick-start |
+| `pkg/lumber/example_test.go` | modified | Added `Example_autoDownload()` |
+| `README.md` | modified | Library section with auto-download paths |
+
+**New files: 3. Modified files: 6. Total: 9.**
+
+### Deferred
+
+- **Semver tag** — `git tag -a v0.9.0` ready to execute after commit
+- **Auto-update mechanism** — checking for newer model versions; v1 uses pinned checksums
+- **Download progress callback** — `WithProgressFunc(func(downloaded, total int64))` for UI consumers
+- **ORT system-level detection** — checking `ldconfig`/`pkg-config` before downloading a private copy
+- **Windows support** — ORT platform matrix doesn't include Windows
+
+### Completion doc
+
+`docs/completions/phase-9.5-library-bootstrap.md`
 
 ---
 

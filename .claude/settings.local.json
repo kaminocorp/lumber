@@ -42,7 +42,9 @@
       "Bash(gh api:*)",
       "Bash(xargs sed:*)",
       "Bash(/tmp/lumber-test -version)",
-      "Bash(rm /tmp/lumber-test)"
+      "Bash(rm /tmp/lumber-test)",
+      "Bash(shasum -a 256 models/model_quantized.onnx models/model_quantized.onnx_data models/vocab.txt models/2_Dense/model.safetensors models/2_Dense/config.json)",
+      "Bash(shasum -a 256)"
     ]
   }
 }
