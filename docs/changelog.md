@@ -2,6 +2,7 @@
 
 ## Index
 
+- [0.9.0](#090--2026-04-02) — Distribution & release pipeline: platform-aware ORT, version injection, multi-platform Makefile, GitHub Release workflow
 - [0.8.0](#080--2026-03-09) — Model source consolidation: all downloads now use official `MongoDB/mdbr-leaf-mt` repo
 - [0.7.0](#070--2026-03-04) — Module rename: `hejijunhao/lumber` → `kaminocorp/lumber`, git remote migration
 - [0.6.0](#060--2026-02-28) — Output architecture & public library API: multi-output fan-out, async wrapper, file/webhook backends, `pkg/lumber` importable API
@@ -18,6 +19,52 @@
 - [0.2.1](#021--2026-02-19) — ONNX Runtime integration: session lifecycle, raw inference, dynamic tensor discovery
 - [0.2.0](#020--2026-02-19) — Model download pipeline: Makefile target, tokenizer config, vocab path
 - [0.1.0](#010--2026-02-19) — Project scaffolding: module structure, pipeline skeleton, classifier, compactor, and default taxonomy
+
+---
+
+## 0.9.0 — 2026-04-02
+
+**Distribution & release pipeline (Phase 9 partial)**
+
+Makes Lumber downloadable and installable as pre-built binaries. Platform-aware ONNX Runtime library loading, build-time version injection, multi-platform Makefile, and a GitHub Actions release workflow that produces self-contained tarballs for 3 platforms. CI quality gate deferred to a later phase.
+
+### Changed
+
+- **Platform-aware ORT library name** — `internal/engine/embedder/onnx.go` now selects `libonnxruntime.dylib` (macOS), `onnxruntime.dll` (Windows), or `libonnxruntime.so` (Linux) via `ortLibraryName()` instead of hardcoding `.so`. Eliminates reliance on macOS `dlopen` fallback behavior.
+- **Version injection via ldflags** — `internal/config/config.go` changed `const Version` to `var Version = "0.8.1"` so `-ldflags "-X ...Version=X.Y.Z"` works at build time. Default serves as fallback for local `go build`.
+- **Makefile: version-injected build** — `build` target injects version via `VERSION ?= dev` and `-ldflags -X`. `make build` uses `"dev"`, `VERSION=X.Y.Z make build` injects a real version.
+- **Makefile: `download-ort` target** — auto-detects platform via `go env GOOS`/`GOARCH`, downloads the correct ONNX Runtime binary from `microsoft/onnxruntime` releases, installs with platform-correct filename. Supports `linux-amd64`, `linux-arm64`, `darwin-arm64`. `download-model` now depends on `download-ort`.
+- **Makefile: cross-platform test target** — sets both `LD_LIBRARY_PATH` (Linux) and `DYLD_LIBRARY_PATH` (macOS) for ORT discovery.
+- **README.md** — added Install section with pre-built binary download (platform table) and build-from-source instructions. Updated Go version requirement to 1.24+.
+
+### Added
+
+- **GitHub Release workflow** — `.github/workflows/release.yml` triggered by `v*` tags. Two-job design:
+  - `build` job: 3 native runners in parallel (`ubuntu-latest`, `ubuntu-24.04-arm`, `macos-14`). Each downloads model files + ORT, compiles with version injection, assembles a self-contained tarball (`bin/lumber` + `models/` + ORT library).
+  - `release` job: downloads all artifacts, generates SHA256 checksums, creates GitHub Release via `softprops/action-gh-release@v2` with auto-generated release notes.
+
+### Deferred
+
+- **CI quality gate** (`ci.yml` with lint, unit tests, integration tests) — intentionally deferred to focus on making Lumber downloadable first
+- **Docker image** — planned for Phase 12a
+- **Homebrew formula** — planned for Phase 12b
+- **Windows / macOS Intel builds** — no current demand / ORT dropped prebuilt Intel binaries
+
+### Files changed
+
+| File | Action | What |
+|------|--------|------|
+| `internal/engine/embedder/onnx.go` | modified | `ortLibraryName()` function; platform-aware library path |
+| `internal/config/config.go` | modified | `const Version` → `var Version` for ldflags injection |
+| `Makefile` | modified | Version-injected build, `download-ort` target, dual library paths in test |
+| `.github/workflows/release.yml` | **new** | 3-platform native build + tarball assembly + GitHub Release |
+| `README.md` | modified | Install section (pre-built binaries + build from source) |
+
+**New files: 1. Modified files: 4. Total: 5.**
+
+### Completion doc
+
+`docs/completions/phase-9-distribution.md`
 
 ---
 

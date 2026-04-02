@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            ort_arch: linux-x64
+            ort_lib_src: "libonnxruntime.so.1.24.1"
+            ort_lib_dest: libonnxruntime.so
+          - os: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+            ort_arch: linux-aarch64
+            ort_lib_src: "libonnxruntime.so.1.24.1"
+            ort_lib_dest: libonnxruntime.so
+          - os: macos-14
+            goos: darwin
+            goarch: arm64
+            ort_arch: osx-arm64
+            ort_lib_src: "libonnxruntime.1.24.1.dylib"
+            ort_lib_dest: libonnxruntime.dylib
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download model files
+        run: |
+          mkdir -p models/2_Dense
+          curl -fSL -o models/model_quantized.onnx \
+            "https://huggingface.co/MongoDB/mdbr-leaf-mt/resolve/main/onnx/model_quantized.onnx"
+          curl -fSL -o models/model_quantized.onnx_data \
+            "https://huggingface.co/MongoDB/mdbr-leaf-mt/resolve/main/onnx/model_quantized.onnx_data"
+          curl -fSL -o models/vocab.txt \
+            "https://huggingface.co/MongoDB/mdbr-leaf-mt/resolve/main/vocab.txt"
+          curl -fSL -o models/2_Dense/model.safetensors \
+            "https://huggingface.co/MongoDB/mdbr-leaf-mt/resolve/main/2_Dense/model.safetensors"
+          curl -fSL -o models/2_Dense/config.json \
+            "https://huggingface.co/MongoDB/mdbr-leaf-mt/resolve/main/2_Dense/config.json"
+
+      - name: Download ONNX Runtime
+        run: |
+          curl -fSL "https://github.com/microsoft/onnxruntime/releases/download/v1.24.1/onnxruntime-${{ matrix.ort_arch }}-1.24.1.tgz" \
+            | tar xz -C /tmp
+          cp "/tmp/onnxruntime-${{ matrix.ort_arch }}-1.24.1/lib/${{ matrix.ort_lib_src }}" \
+            "models/${{ matrix.ort_lib_dest }}"
+
+      - name: Build binary
+        run: |
+          CGO_ENABLED=1 go build \
+            -ldflags "-s -w -X github.com/kaminocorp/lumber/internal/config.Version=${{ steps.version.outputs.version }}" \
+            -o staging/bin/lumber ./cmd/lumber
+
+      - name: Assemble tarball
+        run: |
+          TARBALL="lumber-v${{ steps.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}"
+          mkdir -p "staging/models/2_Dense"
+          cp models/model_quantized.onnx       staging/models/
+          cp models/model_quantized.onnx_data  staging/models/
+          cp models/vocab.txt                  staging/models/
+          cp models/2_Dense/model.safetensors  staging/models/2_Dense/
+          cp models/2_Dense/config.json        staging/models/2_Dense/
+          cp "models/${{ matrix.ort_lib_dest }}" staging/models/
+          mv staging "$TARBALL"
+          tar czf "${TARBALL}.tar.gz" "$TARBALL"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lumber-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: "*.tar.gz"
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: sha256sum *.tar.gz > checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            *.tar.gz
+            checksums.txt
+          generate_release_notes: true

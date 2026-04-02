@@ -1,6 +1,6 @@
 # Lumber — Technical Introduction
 
-**Version 0.5.1-beta** | Go 1.24 | 2 external dependencies | ~50 source files
+**Version 0.8.0** | Go 1.24 | 2 external dependencies | ~69 source files
 
 Lumber is a log normalization pipeline. Raw logs from any provider go in — structured, classified, token-efficient canonical events come out. Classification runs entirely on-device using a local embedding model. No cloud API calls in the processing path.
 
@@ -44,7 +44,8 @@ This makes downstream consumption — whether by LLM agents, dashboards, or aler
 ┌─────────────────────────────────────────────────────────┐
 │                        OUTPUT                            │
 │                                                          │
-│    stdout (NDJSON) — compact or pretty-printed            │
+│    Multi-router → stdout │ file │ webhook                │
+│    Async wrapper for non-blocking delivery                │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -130,7 +131,7 @@ At startup, every leaf is embedded using its parent context and a tuned semantic
 
 Classification is then a single cosine similarity comparison between a log's embedding and all 42 label vectors. Best match wins. If the best score falls below the confidence threshold (default 0.5), the event is marked `UNCLASSIFIED`.
 
-The 104-entry labeled test corpus validates classification at 100% top-1 accuracy.
+The 153-entry labeled test corpus validates classification at 100% top-1 accuracy.
 
 ### Compactor (`internal/engine/compactor/`)
 
@@ -174,7 +175,7 @@ Error handling is per-log: one bad log increments an atomic skip counter and pro
 
 ### Output (`internal/output/`)
 
-Currently stdout-only, writing NDJSON (one JSON object per line) or pretty-printed JSON. The `Output` interface is ready for additional backends:
+A multi-destination fan-out system. Each `Write()` call is delivered to all configured outputs. The `Output` interface:
 
 ```go
 type Output interface {
@@ -183,13 +184,57 @@ type Output interface {
 }
 ```
 
+Four backends are implemented:
+
+| Backend | Package | Behavior |
+|---------|---------|----------|
+| **stdout** | `internal/output/stdout/` | NDJSON or pretty-printed JSON to stdout |
+| **File** | `internal/output/file/` | NDJSON with 64KB buffered writes, size-based rotation (`.1`→`.2`→...`.10`) |
+| **Webhook** | `internal/output/webhook/` | Batched HTTP POST (default 50 events / 5s timer), retry on 5xx with exponential backoff, custom headers |
+| **Multi** | `internal/output/multi/` | Fan-out router — delivers each event to N outputs sequentially, error-isolated via `errors.Join` |
+
+The **async wrapper** (`internal/output/async/`) decouples production from consumption via a buffered channel (default 1024). Two modes: backpressure (blocks when full, default) and drop-on-full (lossy, for non-critical outputs). Used to wrap file and webhook backends so slow I/O doesn't block the pipeline.
+
 Field omission is verbosity-aware: at Minimal, `Raw` and `Confidence` are stripped from the JSON output.
+
+### Public Library API (`pkg/lumber/`)
+
+Lumber is importable as a Go library. The `pkg/lumber` package exposes a stable public API so other Go programs can embed the classification engine directly — no subprocess, no HTTP, no serialization overhead.
+
+```go
+l, _ := lumber.New(lumber.WithModelDir("./models"))
+defer l.Close()
+
+event, _ := l.Classify("ERROR [2026-02-19] UserService — connection refused")
+// event.Type == "ERROR", event.Category == "connection_failure"
+
+events, _ := l.ClassifyBatch([]string{"line1", "line2", "line3"})
+```
+
+| Function | Purpose |
+|----------|---------|
+| `New(opts ...Option)` | Load ONNX model, pre-embed taxonomy (~100-300ms). Create once, reuse. |
+| `Classify(text)` | Classify a single log line → `Event` |
+| `ClassifyBatch(texts)` | Batched inference for multiple lines (more efficient than looping `Classify`) |
+| `ClassifyLog(log)` / `ClassifyLogs(logs)` | Structured input with timestamp, source, and metadata |
+| `Taxonomy()` | Returns the taxonomy tree for read-only introspection |
+| `Close()` | Release ONNX resources |
+
+Options: `WithModelDir`, `WithModelPaths`, `WithConfidenceThreshold`, `WithVerbosity`. Safe for concurrent use.
 
 ### Configuration (`internal/config/`)
 
 All settings load from environment variables with CLI flag overrides. Flags use `flag.Visit()` to overlay only explicitly-set values, avoiding silent override of env vars by flag defaults.
 
-Validation runs at startup and collects all errors (not just the first): missing API keys, nonexistent model files, out-of-range thresholds, invalid enums, query mode without time bounds.
+Validation runs at startup and collects all errors (not just the first): missing API keys, nonexistent model files, out-of-range thresholds, invalid enums, query mode without time bounds, invalid webhook URLs, nonexistent file output directories.
+
+#### Output-related settings
+
+| Environment Variable | CLI Flag | Default | Description |
+|---------------------|----------|---------|-------------|
+| `LUMBER_OUTPUT_FILE` | `-output-file` | `` | File path for NDJSON output (empty = disabled) |
+| `LUMBER_OUTPUT_FILE_MAX_SIZE` | — | `0` | Max file size before rotation (bytes, 0 = no rotation) |
+| `LUMBER_WEBHOOK_URL` | `-webhook-url` | `` | Webhook endpoint URL (empty = disabled) |
 
 ### Logging (`internal/logging/`)
 
@@ -210,6 +255,9 @@ lumber -mode query -connector vercel -from 2026-02-24T00:00:00Z -to 2026-02-24T0
 
 # With options
 lumber -verbosity minimal -pretty -log-level debug
+
+# With file and webhook output
+lumber -output-file /var/log/lumber/events.jsonl -webhook-url https://hooks.example.com/logs
 ```
 
 ### Lifecycle
@@ -218,7 +266,7 @@ lumber -verbosity minimal -pretty -log-level debug
 2. Validate config (fail fast)
 3. Initialize embedder (load ONNX model, vocab, projection weights)
 4. Pre-embed all 42 taxonomy labels
-5. Create engine, output, connector, pipeline
+5. Create engine, build multi-output (stdout + async file + async webhook), create connector and pipeline
 6. Run stream or query
 7. On SIGINT/SIGTERM: cancel context, drain buffer within shutdown timeout, exit
 8. On second signal or timeout: force exit
@@ -238,7 +286,7 @@ Everything else is Go standard library.
 
 ## Model Files
 
-Downloaded via `make download-model` and stored in `models/`:
+Downloaded via `make download-model` from the official `MongoDB/mdbr-leaf-mt` HuggingFace repository and stored in `models/`:
 
 | File | Size | Purpose |
 |------|------|---------|
@@ -250,7 +298,7 @@ Downloaded via `make download-model` and stored in `models/`:
 
 ## Test Infrastructure
 
-- **104-entry labeled corpus** (`internal/engine/testdata/corpus.json`) — real-world log samples spanning all 42 taxonomy categories, validated at 100% accuracy
+- **153-entry labeled corpus** (`internal/engine/testdata/corpus.json`) — real-world log samples spanning all 42 taxonomy categories, validated at 100% accuracy
 - **httptest fixtures** for all three connectors — no live API keys needed
 - **Mock `Processor` interface** — enables pipeline testing without ONNX model files
 - **Integration tests** — full end-to-end: httptest server → connector → real ONNX engine → mock output (guarded by `skipWithoutModel`)

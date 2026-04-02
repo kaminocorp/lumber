@@ -66,25 +66,45 @@ Becomes:
 
 ---
 
-## Quickstart
+## Install
 
-### Prerequisites
+### Pre-built binaries (recommended)
 
-- Go 1.23+
-- `curl` (for model download)
+Download the latest release for your platform from
+[GitHub Releases](https://github.com/kaminocorp/lumber/releases):
 
-### Setup
+| Platform | Archive |
+|----------|---------|
+| Linux x86_64 | `lumber-vX.Y.Z-linux-amd64.tar.gz` |
+| Linux ARM64 | `lumber-vX.Y.Z-linux-arm64.tar.gz` |
+| macOS Apple Silicon | `lumber-vX.Y.Z-darwin-arm64.tar.gz` |
+
+Extract and run:
+
+```bash
+tar xzf lumber-vX.Y.Z-linux-amd64.tar.gz
+cd lumber-vX.Y.Z-linux-amd64
+bin/lumber -version
+```
+
+The release tarball is self-contained — binary, model files, and ONNX
+Runtime library are all included. No additional downloads required.
+
+### Build from source
+
+Requires Go 1.24+ and curl.
 
 ```bash
 git clone https://github.com/kaminocorp/lumber.git
 cd lumber
-
-# Download the embedding model (~23MB) and ONNX runtime library
-make download-model
-
-# Build
+make download-model   # fetches model files + ONNX Runtime for your platform
 make build
+bin/lumber -version
 ```
+
+---
+
+## Quickstart
 
 ### Stream logs
 

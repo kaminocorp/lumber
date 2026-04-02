@@ -3,10 +3,23 @@ package embedder
 import (
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"sync"
 
 	ort "github.com/yalue/onnxruntime_go"
 )
+
+// ortLibraryName returns the platform-specific ONNX Runtime shared library filename.
+func ortLibraryName() string {
+	switch runtime.GOOS {
+	case "darwin":
+		return "libonnxruntime.dylib"
+	case "windows":
+		return "onnxruntime.dll"
+	default:
+		return "libonnxruntime.so"
+	}
+}
 
 // ortEnv manages global ONNX Runtime initialization (process-wide singleton).
 var ortEnv struct {
@@ -38,7 +51,7 @@ func newONNXSession(modelPath string) (*onnxSession, error) {
 	// Resolve the ONNX Runtime shared library path. We ship it alongside the
 	// model files in the models/ directory.
 	modelDir := filepath.Dir(modelPath)
-	libPath := filepath.Join(modelDir, "libonnxruntime.so")
+	libPath := filepath.Join(modelDir, ortLibraryName())
 
 	if err := initORT(libPath); err != nil {
 		return nil, fmt.Errorf("onnx: failed to initialize runtime: %w", err)

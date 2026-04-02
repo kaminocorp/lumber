@@ -1,8 +1,8 @@
 # Lumber — Post-Beta Proposals
 
-**Starting point:** v0.5.1-beta. Phases 1–6 complete. The pipeline works end-to-end: connectors ingest from Vercel/Fly.io/Supabase, the ONNX-based classification engine classifies against 42 taxonomy labels at 100% corpus accuracy, the compactor reduces token footprint, and stdout NDJSON output is production-quality. Structured logging, config validation, graceful shutdown, CLI flags, and a 153-entry test corpus are in place.
+**Starting point:** v0.8.0. Phases 1–8 complete. The pipeline works end-to-end: connectors ingest from Vercel/Fly.io/Supabase, the ONNX-based classification engine classifies against 42 taxonomy labels at 100% corpus accuracy, the compactor reduces token footprint, and multi-destination output (stdout + file + webhook with async fan-out) is production-quality. A public library API (`pkg/lumber`) is available for direct Go embedding. Structured logging, config validation, graceful shutdown, CLI flags, and a 153-entry test corpus are in place.
 
-**This document proposes what to build next**, organized into three horizons: near-term hardening, medium-term capability expansion, and longer-term architectural evolution.
+**This document proposes what to build next**, organized into three horizons: near-term hardening, medium-term capability expansion, and longer-term architectural evolution. Items marked ✅ have been implemented.
 
 ---
 
@@ -95,20 +95,16 @@ type CanonicalEvent struct {
 
 These extend Lumber's reach without changing the core pipeline architecture.
 
-### 2.1 Output Backends
+### 2.1 Output Backends ✅ (file + webhook implemented in v0.6.0)
 
-**The gap:** Only `stdout.Output` exists. The vision doc lists four output modes; three are unbuilt. The `Output` interface is ready — this is pure implementation.
+**Implemented:** File output (`internal/output/file/`) with NDJSON, 64KB buffered writes, and size-based rotation. Webhook output (`internal/output/webhook/`) with batched HTTP POST, retry on 5xx, and custom headers. Multi-router (`internal/output/multi/`) for fan-out to N outputs. Async wrapper (`internal/output/async/`) for non-blocking delivery with backpressure or drop-on-full modes.
 
-**Priority order by value:**
+**Remaining (not yet built):**
 
 | Backend | Why | Scope |
 |---------|-----|-------|
-| **File output** | Batch processing, log rotation, integration with existing tooling | `internal/output/file/` — NDJSON to a configurable path, optional rotation by size/time |
-| **Webhook push** | Integration with Slack, PagerDuty, custom alert pipelines | `internal/output/webhook/` — HTTP POST of batched events, configurable URL + headers + batch size |
 | **HTTP Query API** | Serve classified events to dashboards, agents, or other services on demand | `cmd/lumberd/` or a `-serve` flag — exposes a REST endpoint over classified events. Requires an in-memory or on-disk event store (significant new scope). |
 | **gRPC/WebSocket streaming** | Real-time consumption by remote clients | Largest scope. Requires protocol definitions, connection management, backpressure. |
-
-**Recommendation:** File output first (simplest, immediately useful for batch workflows), webhook second (enables alerting integrations), HTTP server later.
 
 ---
 
@@ -227,27 +223,21 @@ These are larger efforts that introduce new architectural patterns.
 
 ---
 
-### 3.3 Public Library API
+### 3.3 Public Library API ✅ (implemented in v0.6.0)
 
-**The gap:** Everything is in `internal/`. Lumber can only be used as a standalone binary. The vision mentions "Go module (importable as a library)" as a distribution target.
-
-**What this enables:** Other Go programs embed Lumber's classification engine directly — no subprocess, no HTTP, no serialization overhead.
-
-**Approach:** A thin `pkg/lumber/` surface that exposes:
+**Implemented:** `pkg/lumber/` exposes a stable public API:
 
 ```go
-// pkg/lumber/lumber.go
-type Lumber struct { ... }
+l, _ := lumber.New(lumber.WithModelDir("./models"))
+defer l.Close()
 
-func New(opts ...Option) (*Lumber, error)
-func (l *Lumber) Classify(text string) (CanonicalEvent, error)
-func (l *Lumber) ClassifyBatch(texts []string) ([]CanonicalEvent, error)
-func (l *Lumber) Close() error
+event, _ := l.Classify("ERROR connection refused")
+events, _ := l.ClassifyBatch([]string{"line1", "line2"})
+event, _ = l.ClassifyLog(lumber.Log{Text: "...", Source: "api", Timestamp: time.Now()})
+categories := l.Taxonomy()
 ```
 
-Internally wraps the engine. The `internal/` packages remain internal — `pkg/lumber` is the stable public contract.
-
-**When:** After the internal API surface stabilizes. Exposing a public API too early creates backwards-compatibility obligations.
+Functions: `New`, `Classify`, `ClassifyBatch`, `ClassifyLog`, `ClassifyLogs`, `Taxonomy`, `Close`. Options: `WithModelDir`, `WithModelPaths`, `WithConfidenceThreshold`, `WithVerbosity`. Safe for concurrent use. Public `Event` type is a stable contract separate from the internal `model.CanonicalEvent`.
 
 ---
 
@@ -267,24 +257,28 @@ Internally wraps the engine. The `internal/` packages remain internal — `pkg/l
 
 ## Proposed Phase Ordering
 
+Phases 1–8 are complete. The remaining work:
+
 ```
 Horizon 1 (hardening)              Horizon 2 (expansion)              Horizon 3 (evolution)
 ─────────────────────              ─────────────────────              ─────────────────────
 
-Phase 7: Extraction & Polish       Phase 9: Output & Connectors       Phase 11: Adaptive Taxonomy
- ├─ 1.1 Field extraction            ├─ 2.1 File + webhook output       ├─ 3.1 Observation mode
- ├─ 1.2 Stack trace detection       ├─ 2.2 stdin connector             ├─ 3.1 Suggestion mode
- └─ 1.5 Nested JSON stripping       ├─ 2.2 Loki connector             └─ 3.1 Auto-apply mode
-                                     └─ 2.3 Multi-provider fan-in
-Phase 8: Validation & Perf                                             Phase 12: Server & Library
- ├─ 1.3 Live traffic validation    Phase 10: Config & Push              ├─ 3.2 HTTP server mode
- └─ 1.4 Performance benchmarks     ├─ 2.4 Config files                 ├─ 3.3 Public library API
-                                    └─ 2.5 Webhook receiver             └─ 3.4 Docker + releases
+Phase 9: Extraction & Polish       Phase 11: Connectors & Fan-In      Phase 13: Adaptive Taxonomy
+ ├─ 1.1 Field extraction            ├─ 2.2 stdin connector             ├─ 3.1 Observation mode
+ ├─ 1.2 Stack trace detection       ├─ 2.2 Loki connector             ├─ 3.1 Suggestion mode
+ └─ 1.5 Nested JSON stripping       └─ 2.3 Multi-provider fan-in     └─ 3.1 Auto-apply mode
+
+Phase 10: Validation & Perf       Phase 12: Config & Push             Phase 14: Server & Distribution
+ ├─ 1.3 Live traffic validation    ├─ 2.4 Config files                 ├─ 3.2 HTTP server mode
+ └─ 1.4 Performance benchmarks     └─ 2.5 Push-based ingestion         ├─ 2.1 HTTP Query API / gRPC
+                                                                        └─ 3.4 Docker + releases
 ```
 
-**Phases 7 and 8 can run in parallel** — extraction/polish is code work, validation/benchmarks is measurement work. Neither blocks the other.
+✅ **Done:** Output backends (file + webhook + multi-router + async wrapper) — formerly Phase 9/2.1. Public library API — formerly Phase 12/3.3.
 
-**Phase 9 is the highest-value expansion** — file output and stdin connector are both low-effort, high-utility features that dramatically expand how Lumber can be used.
+**Phases 9 and 10 can run in parallel** — extraction/polish is code work, validation/benchmarks is measurement work. Neither blocks the other.
+
+**Phase 11 is the highest-value expansion** — stdin connector is low-effort, high-utility and dramatically expands how Lumber can be used for one-off analysis.
 
 ---
 
@@ -302,4 +296,4 @@ These should be resolved before or during the relevant phase:
 
 5. **Multi-connector config UX** — comma-separated flag (`-connector vercel,supabase`)? Repeated flags (`-connector vercel -connector supabase`)? Config-file-only? The env var model (`LUMBER_CONNECTOR=vercel`) doesn't naturally extend to multiple providers.
 
-6. **Public API stability** — when is the internal API stable enough to expose as `pkg/lumber`? What's the versioning strategy (semver, with the understanding that pre-1.0 allows breaking changes)?
+6. ~~**Public API stability**~~ — resolved. `pkg/lumber` is implemented (v0.6.0) with a stable `Event` type decoupled from the internal `model.CanonicalEvent`. Pre-1.0 semver allows breaking changes if needed.

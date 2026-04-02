@@ -40,7 +40,9 @@
       "Bash(go:*)",
       "Bash(find .:*)",
       "Bash(gh api:*)",
-      "Bash(xargs sed:*)"
+      "Bash(xargs sed:*)",
+      "Bash(/tmp/lumber-test -version)",
+      "Bash(rm /tmp/lumber-test)"
     ]
   }
 }
